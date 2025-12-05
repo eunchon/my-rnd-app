@@ -5,7 +5,7 @@
   "type": "commonjs",
   "scripts": {
     "dev": "npx tsx src/server.ts",
-    "build": "tsc",
+    "build": "npx tsc && vite build",
     "start": "node dist/server.js",
     "prisma:migrate": "prisma migrate dev --name init",
     "prisma:generate": "prisma generate",
