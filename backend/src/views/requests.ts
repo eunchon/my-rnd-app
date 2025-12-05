@@ -329,7 +329,7 @@ router.patch('/:id', authMiddleware, requireRole(['ADMIN', 'EXEC', 'RD', 'SALES'
   const allowedKeys = [
     'title', 'customerName', 'productArea', 'productModel', 'category', 'expectedRevenue', 'importanceFlag',
     'customerDeadline', 'currentStage', 'currentStatus', 'region', 'rawCustomerText', 'salesSummary',
-    'revenueEstimateStatus', 'revenueEstimateNote'
+    'revenueEstimateStatus', 'revenueEstimateNote', 'createdByUserId', 'createdByDept'
   ];
   for (const k of allowedKeys) {
     if (body[k] !== undefined && body[k] !== null) {
@@ -338,15 +338,26 @@ router.patch('/:id', authMiddleware, requireRole(['ADMIN', 'EXEC', 'RD', 'SALES'
       else data[k] = body[k];
     }
   }
+  const newRdGroups: string[] | undefined = Array.isArray(body.rdGroupIds) ? body.rdGroupIds : undefined;
   const stageChanged = body.currentStage && body.currentStage !== existing.currentStage;
-  if (Object.keys(data).length > 0) {
-    await prisma.request.update({ where: { id }, data });
-  }
-  if (stageChanged) {
-    const now = new Date();
-    await prisma.stageHistory.updateMany({ where: { requestId: id, exitedAt: null }, data: { exitedAt: now } });
-    await prisma.stageHistory.create({ data: { requestId: id, stage: body.currentStage, enteredAt: now, exitedAt: null } });
-  }
+  await prisma.$transaction(async (tx) => {
+    if (Object.keys(data).length > 0) {
+      await tx.request.update({ where: { id }, data });
+    }
+    if (stageChanged) {
+      const now = new Date();
+      await tx.stageHistory.updateMany({ where: { requestId: id, exitedAt: null }, data: { exitedAt: now } });
+      await tx.stageHistory.create({ data: { requestId: id, stage: body.currentStage, enteredAt: now, exitedAt: null } });
+    }
+    if (newRdGroups) {
+      await tx.requestRDGroup.deleteMany({ where: { requestId: id } });
+      if (newRdGroups.length) {
+        await tx.requestRDGroup.createMany({
+          data: newRdGroups.map((g) => ({ requestId: id, rdGroupId: g, role: 'LEAD' })),
+        });
+      }
+    }
+  });
   const updated = await prisma.request.findUnique({ where: { id }, include: detailInclude });
   res.json(updated ? { ...updated, expectedRevenue: toNumber(updated.expectedRevenue) } : updated);
 });

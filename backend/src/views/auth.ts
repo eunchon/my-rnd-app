@@ -125,6 +125,23 @@ router.post('/reset-password', async (req, res) => {
   }
 });
 
+// User search (for assigning author by email)
+router.get('/users', authMiddleware, async (req, res) => {
+  const q = (req.query.q || '').toString().trim();
+  if (!q || q.length < 2) return res.json([]);
+  const users = await prisma.user.findMany({
+    where: {
+      OR: [
+        { email: { contains: q, mode: 'insensitive' } },
+        { name: { contains: q, mode: 'insensitive' } },
+      ],
+    },
+    take: 10,
+    select: { id: true, name: true, email: true, dept: true, role: true, organization: true },
+  });
+  res.json(users);
+});
+
 export function authMiddleware(req: any, res: any, next: any) {
   const auth = req.headers.authorization;
   if (!auth || !auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Missing token' });
