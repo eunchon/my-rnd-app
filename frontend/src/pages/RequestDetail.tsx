@@ -120,20 +120,24 @@ export default function RequestDetail({
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <span style={{ color: '#666' }}>{t('th_stage')}: {item.currentStage}</span>
-          <select value={stageUpdate} onChange={(e) => setStageUpdate(e.target.value)} style={{ padding: '6px 8px', borderRadius: 8 }}>
-            <option value="">{t('filter_stage_all')}</option>
-            {stageOptions.map((s) => <option key={s} value={s}>{s}</option>)}
-          </select>
-          <input
-            placeholder="상태 메모"
-            value={statusUpdate}
-            onChange={(e) => setStatusUpdate(e.target.value)}
-            style={{ padding: '6px 8px', borderRadius: 8, border: '1px solid #e2e8f0' }}
-          />
-          <button disabled={!item || saving || (!stageUpdate && !statusUpdate)} onClick={updateStage} style={{ padding: '8px 12px' }}>
-            {saving ? 'Saving...' : 'Update'}
-          </button>
-          {!editing && (
+          {!isReadOnly && (
+            <>
+              <select value={stageUpdate} onChange={(e) => setStageUpdate(e.target.value)} style={{ padding: '6px 8px', borderRadius: 8 }}>
+                <option value="">{t('filter_stage_all')}</option>
+                {stageOptions.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+              <input
+                placeholder="상태 메모"
+                value={statusUpdate}
+                onChange={(e) => setStatusUpdate(e.target.value)}
+                style={{ padding: '6px 8px', borderRadius: 8, border: '1px solid #e2e8f0' }}
+              />
+              <button disabled={!item || saving || (!stageUpdate && !statusUpdate)} onClick={updateStage} style={{ padding: '8px 12px' }}>
+                {saving ? 'Saving...' : 'Update'}
+              </button>
+            </>
+          )}
+          {!editing && !isReadOnly && (
             <button
               onClick={() => {
                 setEditing(true);
@@ -151,7 +155,7 @@ export default function RequestDetail({
               Edit
             </button>
           )}
-          {editing && (
+          {editing && !isReadOnly && (
             <>
               <button onClick={() => { setEditing(false); setDraft(null); }}>Cancel</button>
               <button
@@ -176,6 +180,25 @@ export default function RequestDetail({
                 Save
               </button>
             </>
+          )}
+          {!isReadOnly && !openInModal && (
+            <button
+              style={{ background: '#fee2e2', border: '1px solid #fecaca', padding: '8px 12px', borderRadius: 8 }}
+              onClick={async () => {
+                if (!confirm('정말 삭제하시겠습니까?')) return;
+                setSaving(true);
+                try {
+                  await deleteJSON(`/requests/${item.id}`);
+                  navigate('/list');
+                } catch (e: any) {
+                  setError(e?.message || 'Delete failed');
+                } finally {
+                  setSaving(false);
+                }
+              }}
+            >
+              Delete
+            </button>
           )}
           {openInModal && <button onClick={onClose}>Close</button>}
         </div>
