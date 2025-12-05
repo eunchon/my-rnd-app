@@ -207,6 +207,8 @@ export default function RequestDetail({
                     if (payload.expectedRevenue === '') payload.expectedRevenue = null;
                     else payload.expectedRevenue = Number(payload.expectedRevenue);
                     if (payload.customerDeadline) payload.customerDeadline = new Date(payload.customerDeadline).toISOString();
+                    if (!payload.createdByUserId) payload.createdByUserId = item.createdByUserId;
+                    if (!payload.createdByDept) payload.createdByDept = item.createdByDept;
                     const updated = await patchJSON<DetailRequest>(`/requests/${item.id}`, payload);
                     setItem(updated);
                     setEditing(false);
