@@ -236,7 +236,34 @@ export default function RequestDetail({
 
       {item.technicalNotes && (
         <Card title="기술 요구/제약 메모">
-          <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>{item.technicalNotes}</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+            {item.technicalNotes
+              .split(/\r?\n/)
+              .map((line) => line.trim())
+              .filter(Boolean)
+              .map((line, idx) => {
+                const [key, ...rest] = line.split(':');
+                const label = rest.length ? key.trim() : 'Note';
+                const value = rest.length ? rest.join(':').trim() : line;
+                return (
+                  <div
+                    key={`${line}-${idx}`}
+                    style={{
+                      flex: '1 1 240px',
+                      minWidth: 220,
+                      border: '1px solid #e2e8f0',
+                      borderRadius: 12,
+                      padding: '10px 12px',
+                      background: '#f8fafc',
+                      boxShadow: '0 6px 14px rgba(15, 23, 42, 0.08)',
+                    }}
+                  >
+                    <div style={{ fontSize: 12, color: '#64748b', marginBottom: 4 }}>{label}</div>
+                    <div style={{ fontWeight: 700, color: '#0f172a', lineHeight: 1.4 }}>{value || '-'}</div>
+                  </div>
+                );
+              })}
+          </div>
         </Card>
       )}
       {item.customerInfluenceScore !== null && item.customerInfluenceScore !== undefined && (
