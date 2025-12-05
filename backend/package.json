@@ -4,8 +4,8 @@
   "main": "dist/server.js",
   "type": "commonjs",
   "scripts": {
-    "dev": "npx tsx src/server.ts",
-    "build": "npx tsc && vite build",
+    "dev": "vite",
+    "build": "npx tsc -b && vite build",
     "start": "node dist/server.js",
     "prisma:migrate": "prisma migrate dev --name init",
     "prisma:generate": "prisma generate",
