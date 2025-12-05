@@ -24,13 +24,14 @@ function App() {
 function RoleAwareLayout({ role }: { role: 'viewer' | 'executive' | string }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const onlyList = role === 'viewer';
+  const roleUpper = (role || '').toUpperCase();
+  const onlyList = roleUpper === 'VIEWER';
   const t = useT();
   const lang = useLang();
   const token = getAuthToken();
   const decoded = token ? decodeToken(token) : null;
   const name = decoded?.name || '';
-  const userRole = decoded?.role || role;
+  const userRole = (decoded?.role || roleUpper || '').toUpperCase();
   const isActive = (path: string) => location.pathname === path || location.pathname.startsWith(`${path}/`);
   return (
     <div className="container">

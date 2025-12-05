@@ -14,9 +14,9 @@ export default function LoginPage() {
     setError(null);
     try {
       const res = await postJSON<{ token: string }>('/auth/login', { email, password });
-      setAuthToken(res.token);
       const user = decodeToken(res.token);
       if (!user) throw new Error('Invalid token');
+      setAuthToken(res.token);
       navigate('/');
     } catch (err: any) {
       setError(err?.message || 'Login failed');

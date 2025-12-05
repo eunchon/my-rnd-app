@@ -40,9 +40,9 @@ export default function SignupPage() {
           role: form.role,
         }
       );
-      setAuthToken(res.token);
       const user = decodeToken(res.token);
       if (!user) throw new Error('Invalid token');
+      setAuthToken(res.token);
       navigate('/');
     } catch (err: any) {
       const msg = err instanceof Error ? err.message : 'Signup failed';
