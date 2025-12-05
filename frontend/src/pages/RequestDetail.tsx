@@ -180,12 +180,21 @@ export default function RequestDetail({
                   if (!draft) return;
                   setSaving(true);
                   try {
-                    const payload: any = { ...draft };
-                    if (payload.expectedRevenue === '') payload.expectedRevenue = null;
-                    else payload.expectedRevenue = Number(payload.expectedRevenue);
-                    if (payload.customerDeadline) payload.customerDeadline = new Date(payload.customerDeadline).toISOString();
-                    if (!payload.createdByUserId) payload.createdByUserId = item.createdByUserId;
-                    if (!payload.createdByDept) payload.createdByDept = item.createdByDept;
+                    const payload: any = {
+                      expectedRevenue: draft.expectedRevenue === '' ? null : Number(draft.expectedRevenue ?? item.expectedRevenue ?? 0),
+                      importanceFlag: draft.importanceFlag ?? item.importanceFlag,
+                      customerDeadline: draft.customerDeadline
+                        ? new Date(draft.customerDeadline).toISOString()
+                        : item.customerDeadline,
+                      createdByUserId: draft.createdByUserId || item.createdByUserId,
+                      createdByDept: draft.createdByDept || item.createdByDept,
+                      salesSummary: draft.salesSummary ?? item.salesSummary,
+                      rawCustomerText: draft.rawCustomerText ?? item.rawCustomerText,
+                      rdGroupIds: draft.rdGroupIds ?? item.rdGroups.map((x) => x.rdGroup.id),
+                      title: draft.title ?? item.title,
+                      customerName: draft.customerName ?? item.customerName,
+                      productArea: draft.productArea ?? item.productArea,
+                    };
                     const updated = await patchJSON<DetailRequest>(`/requests/${item.id}`, payload);
                     setItem(updated);
                     setEditing(false);
