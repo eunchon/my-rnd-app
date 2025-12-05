@@ -183,7 +183,7 @@ export default function RequestDetail({
           )}
           {!isReadOnly && (
             <button
-              style={{ background: '#fee2e2', border: '1px solid #fecaca', padding: '8px 12px', borderRadius: 8 }}
+              style={{ background: '#ef4444', color: '#fff', border: '1px solid #dc2626', padding: '8px 12px', borderRadius: 8, fontWeight: 700, boxShadow: '0 6px 12px rgba(239,68,68,0.35)' }}
               onClick={async () => {
                 if (!confirm('정말 삭제하시겠습니까?')) return;
                 setSaving(true);
