@@ -181,7 +181,7 @@ export default function RequestDetail({
               </button>
             </>
           )}
-          {!isReadOnly && !openInModal && (
+          {!isReadOnly && (
             <button
               style={{ background: '#fee2e2', border: '1px solid #fecaca', padding: '8px 12px', borderRadius: 8 }}
               onClick={async () => {
@@ -189,7 +189,8 @@ export default function RequestDetail({
                 setSaving(true);
                 try {
                   await deleteJSON(`/requests/${item.id}`);
-                  navigate('/list');
+                  if (openInModal && onClose) onClose();
+                  else navigate('/list');
                 } catch (e: any) {
                   setError(e?.message || 'Delete failed');
                 } finally {
