@@ -7,10 +7,17 @@ export type AuthUser = {
   email?: string;
 };
 
+function decodeBase64UrlToString(segment: string) {
+  const padded = segment.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(segment.length / 4) * 4, '=');
+  const binary = atob(padded);
+  const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
+}
+
 export function decodeToken(token: string): AuthUser | null {
   try {
     const payload = token.split('.')[1];
-    const decoded = JSON.parse(atob(payload));
+    const decoded = JSON.parse(decodeBase64UrlToString(payload));
     return {
       user_id: decoded.user_id,
       role: decoded.role,
