@@ -54,9 +54,6 @@ export default function RequestDetail({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<any | null>(null);
   const [rdGroups, setRdGroups] = useState<{ id: string; name: string; category: string | null }[]>([]);
-  const [userSearch, setUserSearch] = useState('');
-  const [userResults, setUserResults] = useState<{ id: string; name: string; email: string; dept: string; role: string }[]>([]);
-  const [userLoading, setUserLoading] = useState(false);
 
   useEffect(() => {
     if (readOnly) {
@@ -93,26 +90,6 @@ export default function RequestDetail({
     };
     loadGroups();
   }, []);
-
-  useEffect(() => {
-    if (!editing) return;
-    const handler = setTimeout(async () => {
-      if (!userSearch || userSearch.length < 2) {
-        setUserResults([]);
-        return;
-      }
-      setUserLoading(true);
-      try {
-        const users = await fetchJSON<any[]>(`/auth/users?q=${encodeURIComponent(userSearch)}`);
-        setUserResults(users);
-      } catch {
-        setUserResults([]);
-      } finally {
-        setUserLoading(false);
-      }
-    }, 250);
-    return () => clearTimeout(handler);
-  }, [userSearch, editing]);
 
   if (!id) return null;
   if (loading) return <div style={{ padding: 16 }}>{t('loading')}</div>;
@@ -271,34 +248,10 @@ export default function RequestDetail({
           <input value={draft?.createdByDept ?? item.createdByDept} onChange={(e) => setDraft({ ...draft, createdByDept: e.target.value })} />
         ) : item.createdByDept} />
         <InfoRow label="작성자" value={editing ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <input
-              placeholder="이메일 검색"
-              value={userSearch}
-              onChange={(e) => setUserSearch(e.target.value)}
-              style={{ width: '100%' }}
-            />
-            <div style={{ maxHeight: 120, overflow: 'auto', border: '1px solid #e2e8f0', borderRadius: 8, padding: 6 }}>
-              {userLoading && <div style={{ fontSize: 12, color: '#64748b' }}>검색 중...</div>}
-              {!userLoading && userResults.length === 0 && userSearch.length >= 2 && (
-                <div style={{ fontSize: 12, color: '#94a3b8' }}>결과 없음</div>
-              )}
-              {userResults.map((u) => (
-                <button
-                  key={u.id}
-                  type="button"
-                  onClick={() => {
-                    setDraft({ ...draft, createdByUserId: u.id, createdByDept: u.dept });
-                    setUserSearch(u.email);
-                  }}
-                  style={{ display: 'block', width: '100%', textAlign: 'left', padding: '4px 6px', border: 'none', background: '#fff', cursor: 'pointer' }}
-                >
-                  {u.email} ({u.name}, {u.dept})
-                </button>
-              ))}
-            </div>
-            <div style={{ fontSize: 12, color: '#475569' }}>선택된 사용자 ID: {draft?.createdByUserId || item.createdByUserId}</div>
-          </div>
+          <input
+            value={draft?.createdByUserId ?? item.createdByUserId}
+            onChange={(e) => setDraft({ ...draft, createdByUserId: e.target.value })}
+          />
         ) : item.createdByUserId} />
       </div>
 

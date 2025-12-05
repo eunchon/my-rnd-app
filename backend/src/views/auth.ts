@@ -125,7 +125,7 @@ router.post('/reset-password', async (req, res) => {
   }
 });
 
-// User search (for assigning author by email)
+// User search (kept for potential future use)
 router.get('/users', authMiddleware, async (req, res) => {
   const q = (req.query.q || '').toString().trim();
   if (!q || q.length < 2) return res.json([]);
