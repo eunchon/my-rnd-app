@@ -8,6 +8,8 @@ import RequestList from './pages/RequestList';
 import RequestDetail from './pages/RequestDetail';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 import { getAuthToken, decodeToken, clearAuth } from './auth';
 
 function App() {
@@ -76,6 +78,8 @@ function RoleAwareLayout({ role }: { role: 'viewer' | 'executive' | string }) {
         {token && !onlyList && userRole !== 'external_viewer' && <Route path="/request" element={<RequestForm />} />}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         {/* Fallback */}
         <Route path="*" element={<Navigate to={token ? (onlyList ? '/list' : '/') : '/login'} replace />} />
       </Routes>
