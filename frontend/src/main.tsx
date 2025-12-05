@@ -1,6 +1,6 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import { BrowserRouter, Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useT, useLang, setLang } from './i18n';
 import RequestForm from './pages/RequestForm';
 import Dashboard from './pages/Dashboard';
@@ -23,6 +23,7 @@ function App() {
 
 function RoleAwareLayout({ role }: { role: 'viewer' | 'executive' | string }) {
   const location = useLocation();
+  const navigate = useNavigate();
   const onlyList = role === 'viewer';
   const t = useT();
   const lang = useLang();
@@ -50,7 +51,7 @@ function RoleAwareLayout({ role }: { role: 'viewer' | 'executive' | string }) {
           {token ? (
             <>
               <span style={{ color: '#666', fontWeight: 600 }}>{name} · {userRole}</span>
-              <button onClick={() => { clearAuth(); window.location.href = '/login'; }} style={{ padding: '6px 10px' }}>Logout</button>
+              <button onClick={() => { clearAuth(); navigate('/login', { replace: true }); }} style={{ padding: '6px 10px' }}>Logout</button>
             </>
           ) : (
             <div style={{ display: 'flex', gap: 8 }}>
