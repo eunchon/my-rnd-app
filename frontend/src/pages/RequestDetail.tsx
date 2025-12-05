@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { fetchJSON, patchJSON } from '../api';
+import { fetchJSON, patchJSON, deleteJSON } from '../api';
 import { useT } from '../i18n';
 import { formatKRW } from '../utils/currency';
 
@@ -55,6 +55,13 @@ export default function RequestDetail({
   const [draft, setDraft] = useState<any | null>(null);
 
   useEffect(() => {
+    if (readOnly) {
+      setEditing(false);
+      setDraft(null);
+    }
+  }, [readOnly]);
+
+  useEffect(() => {
     if (!id) return;
     const load = async () => {
       setLoading(true);
@@ -77,9 +84,10 @@ export default function RequestDetail({
   if (!item) return null;
 
   const stageOptions = ['IDEATION', 'REVIEW', 'CONFIRM', 'PROJECT', 'REJECTED', 'RELEASE'];
+  const isReadOnly = !!readOnly;
 
   async function updateStage() {
-    if (readOnly) return;
+    if (isReadOnly) return;
     if (!item) return;
     if (!stageUpdate && !statusUpdate) return;
     setSaving(true);
