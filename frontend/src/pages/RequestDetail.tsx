@@ -222,6 +222,18 @@ export default function RequestDetail({
         <InfoRow label="작성자" value={item.createdByUserId} />
       </div>
 
+      <Card title="고객 원문">
+        {editing ? (
+          <textarea
+            value={draft?.rawCustomerText ?? ''}
+            onChange={(e) => setDraft({ ...draft, rawCustomerText: e.target.value })}
+            style={{ width: '100%', minHeight: 80 }}
+          />
+        ) : (
+          <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>{item.rawCustomerText}</div>
+        )}
+      </Card>
+
       <Card title="영업 요약">
         {editing ? (
           <textarea
@@ -266,46 +278,7 @@ export default function RequestDetail({
           </div>
         </Card>
       )}
-      {item.customerInfluenceScore !== null && item.customerInfluenceScore !== undefined && (
-        <Card title="고객 영향력 점수">
-          <div style={{ fontWeight: 800, fontSize: 16 }}>{item.customerInfluenceScore}</div>
-        </Card>
-      )}
-
-      {item.techAreas && item.techAreas.length > 0 && (
-        <Card title="기술 요구/제약 (선택 항목)">
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            {item.techAreas.map((t, idx) => (
-              <span
-                key={t.id || `${t.code || 'tech'}-${idx}`}
-                style={{
-                  padding: '6px 10px',
-                  borderRadius: 10,
-                  background: '#f1f5f9',
-                  border: '1px solid #e2e8f0',
-                  fontSize: 12,
-                  fontWeight: 700,
-                  color: '#0f172a',
-                }}
-              >
-                {t.label || t.code || t.groupName || '기술 요구/제약'}
-              </span>
-            ))}
-          </div>
-        </Card>
-      )}
-
-      <Card title="고객 원문">
-        {editing ? (
-          <textarea
-            value={draft?.rawCustomerText ?? ''}
-            onChange={(e) => setDraft({ ...draft, rawCustomerText: e.target.value })}
-            style={{ width: '100%', minHeight: 80 }}
-          />
-        ) : (
-          <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>{item.rawCustomerText}</div>
-        )}
-      </Card>
+      {/* 고객 영향력 점수 및 선택형 기술 요구 섹션 제거 */}
 
       <Card title="담당 R&D 그룹">
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
