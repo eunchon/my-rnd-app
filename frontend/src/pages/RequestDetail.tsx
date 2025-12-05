@@ -30,7 +30,17 @@ type DetailRequest = {
   customerInfluenceScore?: number | null;
 };
 
-export default function RequestDetail({ requestId, openInModal, onClose }: { requestId?: string; openInModal?: boolean; onClose?: () => void }) {
+export default function RequestDetail({
+  requestId,
+  openInModal,
+  onClose,
+  readOnly,
+}: {
+  requestId?: string;
+  openInModal?: boolean;
+  onClose?: () => void;
+  readOnly?: boolean;
+}) {
   const params = useParams<{ id: string }>();
   const id = requestId || params.id;
   const t = useT();
@@ -69,6 +79,7 @@ export default function RequestDetail({ requestId, openInModal, onClose }: { req
   const stageOptions = ['IDEATION', 'REVIEW', 'CONFIRM', 'PROJECT', 'REJECTED', 'RELEASE'];
 
   async function updateStage() {
+    if (readOnly) return;
     if (!item) return;
     if (!stageUpdate && !statusUpdate) return;
     setSaving(true);

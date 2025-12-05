@@ -3,6 +3,7 @@ import { fetchJSON } from '../api';
 import { useT } from '../i18n';
 import { formatKRW } from '../utils/currency';
 import RequestDetail from './RequestDetail';
+import { decodeToken, getAuthToken } from '../auth';
 
 type RequestItem = {
   id: string;
@@ -27,6 +28,12 @@ type RequestItem = {
 
 export default function RequestList() {
   const t = useT();
+  const roleUpper = (() => {
+    const token = getAuthToken();
+    const decoded = token ? decodeToken(token) : null;
+    return (decoded?.role || '').toUpperCase();
+  })();
+  const readOnly = roleUpper === 'VIEWER' || roleUpper === 'EXTERNAL_VIEWER';
   const [items, setItems] = useState<RequestItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -523,7 +530,7 @@ export default function RequestList() {
                 Close
               </button>
             </div>
-            <RequestDetail requestId={selectedId} openInModal onClose={() => setSelectedId(null)} />
+            <RequestDetail requestId={selectedId} openInModal onClose={() => setSelectedId(null)} readOnly={readOnly} />
           </div>
         </div>
       )}

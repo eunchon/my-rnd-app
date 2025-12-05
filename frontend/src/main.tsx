@@ -24,14 +24,14 @@ function App() {
 function RoleAwareLayout({ role }: { role: 'viewer' | 'executive' | string }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const roleUpper = (role || '').toUpperCase();
-  const onlyList = roleUpper === 'VIEWER';
-  const t = useT();
-  const lang = useLang();
   const token = getAuthToken();
   const decoded = token ? decodeToken(token) : null;
+  const roleUpper = (decoded?.role || role || '').toString().toUpperCase();
+  const onlyList = roleUpper === 'VIEWER' || roleUpper === 'EXTERNAL_VIEWER';
+  const t = useT();
+  const lang = useLang();
   const name = decoded?.name || '';
-  const userRole = (decoded?.role || roleUpper || '').toUpperCase();
+  const userRole = roleUpper;
   const isActive = (path: string) => location.pathname === path || location.pathname.startsWith(`${path}/`);
   return (
     <div className="container">
@@ -71,8 +71,8 @@ function RoleAwareLayout({ role }: { role: 'viewer' | 'executive' | string }) {
         {token && onlyList && location.pathname === '/' && <Route path="/" element={<Navigate to="/list" replace />} />}
         {token && !onlyList && <Route path="/" element={<Dashboard />} />}
         {token && <Route path="/list" element={<RequestList />} />}
-        {token && <Route path="/list/:id" element={<RequestDetail />} />}
-        {token && <Route path="/request/:id" element={<RequestDetail />} />}
+        {token && <Route path="/list/:id" element={<RequestDetail readOnly={onlyList} />} />}
+        {token && <Route path="/request/:id" element={<RequestDetail readOnly={onlyList} />} />}
         {token && !onlyList && userRole !== 'external_viewer' && <Route path="/request" element={<RequestForm />} />}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
