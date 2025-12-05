@@ -36,7 +36,7 @@ function RoleAwareLayout({ role }: { role: 'viewer' | 'executive' | string }) {
   return (
     <div className="container">
       <header>
-        <Link to="/" className="brand" style={{ textDecoration: 'none', color: 'inherit', gap: 12 }}>
+        <Link to={onlyList ? '/list' : '/'} className="brand" style={{ textDecoration: 'none', color: 'inherit', gap: 12 }}>
           <img src="/genoray_ci_2-2.png" alt="Genoray" style={{ height: 36, objectFit: 'contain' }} />
           <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
             <div style={{ fontSize: 18, cursor: 'pointer' }}>{t('app_title')}</div>
