@@ -37,6 +37,7 @@ model Request {
   currentStatus    String?
   createdByDept    String
   createdByUserId  String
+  createdByName    String?
   createdBy        User           @relation(fields: [createdByUserId], references: [id])
   region           String?
   rawCustomerText  String

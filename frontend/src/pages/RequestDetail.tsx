@@ -19,6 +19,7 @@ type DetailRequest = {
   currentStatus: string | null;
   createdByDept: string;
   createdByUserId: string;
+  createdByName?: string | null;
   region: string | null;
   rawCustomerText: string;
   salesSummary: string;
@@ -165,6 +166,7 @@ export default function RequestDetail({
                   customerDeadline: item.customerDeadline,
                   createdByUserId: item.createdByUserId,
                   createdByDept: item.createdByDept,
+                  createdByName: item.createdByName ?? '',
                   rdGroupIds: item.rdGroups.map((x) => x.rdGroup.id),
                 });
               }}
@@ -188,6 +190,7 @@ export default function RequestDetail({
                         : item.customerDeadline,
                       createdByUserId: draft.createdByUserId || item.createdByUserId,
                       createdByDept: draft.createdByDept || item.createdByDept,
+                      createdByName: draft.createdByName ?? item.createdByName ?? '',
                       salesSummary: draft.salesSummary ?? item.salesSummary,
                       rawCustomerText: draft.rawCustomerText ?? item.rawCustomerText,
                       rdGroupIds: draft.rdGroupIds ?? item.rdGroups.map((x) => x.rdGroup.id),
@@ -258,10 +261,10 @@ export default function RequestDetail({
         ) : item.createdByDept} />
         <InfoRow label="작성자" value={editing ? (
           <input
-            value={draft?.createdByUserId ?? item.createdByUserId}
-            onChange={(e) => setDraft({ ...draft, createdByUserId: e.target.value })}
+            value={draft?.createdByName ?? draft?.createdByUserId ?? item.createdByName ?? item.createdByUserId}
+            onChange={(e) => setDraft({ ...draft, createdByName: e.target.value, createdByUserId: item.createdByUserId })}
           />
-        ) : item.createdByUserId} />
+        ) : (item.createdByName || item.createdByUserId)} />
       </div>
 
       <Card title="고객 원문">

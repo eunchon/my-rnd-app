@@ -151,6 +151,7 @@ router.post('/', authMiddleware, requireRole(['SALES', 'EXEC', 'ADMIN']), async 
   const authUser = (req as any).user;
   const creatorId = authUser?.user_id || data.createdByUserId || 'unknown-user';
   const creatorDept = (authUser?.organization as string) || data.createdByDept || 'unknown-dept';
+  const creatorName = authUser?.name || data.createdByName || null;
 
   const influenceNumbers = [
     data.influenceRevenue ?? 0,
@@ -195,6 +196,7 @@ router.post('/', authMiddleware, requireRole(['SALES', 'EXEC', 'ADMIN']), async 
       currentStatus: data.currentStatus ?? 'SUBMITTED',
       createdByDept: creatorDept,
       createdByUserId: creatorId,
+      createdByName: creatorName,
       region: data.region ?? null,
       rawCustomerText: data.rawCustomerText,
       salesSummary: data.salesSummary,
@@ -329,7 +331,7 @@ router.patch('/:id', authMiddleware, requireRole(['ADMIN', 'EXEC', 'RD', 'SALES'
   const allowedKeys = [
     'title', 'customerName', 'productArea', 'productModel', 'category', 'expectedRevenue', 'importanceFlag',
     'customerDeadline', 'currentStage', 'currentStatus', 'region', 'rawCustomerText', 'salesSummary',
-    'revenueEstimateStatus', 'revenueEstimateNote', 'createdByUserId', 'createdByDept'
+    'revenueEstimateStatus', 'revenueEstimateNote', 'createdByUserId', 'createdByDept', 'createdByName'
   ];
   for (const k of allowedKeys) {
     if (body[k] !== undefined && body[k] !== null) {
