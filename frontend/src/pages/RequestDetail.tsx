@@ -181,7 +181,9 @@ export default function RequestDetail({
                 onClick={async () => {
                   if (!draft) return;
                   const nextAuthorName = (draft.createdByName ?? '').trim();
-                  const nextAuthorId = nextAuthorName || draft.createdByUserId || item.createdByUserId;
+                  const nextAuthorId = (draft.createdByUserId ?? '').trim();
+                  const authorNameForSave = nextAuthorName || nextAuthorId || item.createdByName || item.createdByUserId;
+                  const authorIdForSave = nextAuthorName || nextAuthorId || item.createdByUserId;
                   setSaving(true);
                   try {
                     const payload: any = {
@@ -190,9 +192,9 @@ export default function RequestDetail({
                       customerDeadline: draft.customerDeadline
                         ? new Date(draft.customerDeadline).toISOString()
                         : item.customerDeadline,
-                      createdByUserId: nextAuthorId,
+                      createdByUserId: authorIdForSave,
                       createdByDept: draft.createdByDept || item.createdByDept,
-                      createdByName: nextAuthorName || item.createdByName || '',
+                      createdByName: authorNameForSave,
                       salesSummary: draft.salesSummary ?? item.salesSummary,
                       rawCustomerText: draft.rawCustomerText ?? item.rawCustomerText,
                       rdGroupIds: draft.rdGroupIds ?? item.rdGroups.map((x) => x.rdGroup.id),
@@ -201,7 +203,11 @@ export default function RequestDetail({
                       productArea: draft.productArea ?? item.productArea,
                     };
                     const updated = await patchJSON<DetailRequest>(`/requests/${item.id}`, payload);
-                    setItem(updated);
+                    setItem({
+                      ...updated,
+                      createdByName: updated.createdByName ?? authorNameForSave,
+                      createdByUserId: updated.createdByUserId ?? authorIdForSave,
+                    });
                     setEditing(false);
                     setDraft(null);
                   } catch (e: any) {
