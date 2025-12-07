@@ -93,6 +93,19 @@ export default function RequestForm() {
     return num.toLocaleString();
   }, [form.expectedRevenue]);
 
+  const jobTitleOptions = useMemo(
+    () => [
+      { value: '', label: '-' },
+      { value: 'Staff', label: lang === 'ko' ? '사원' : 'Staff' },
+      { value: 'Assistant Manager', label: lang === 'ko' ? '대리' : 'Assistant Manager' },
+      { value: 'Manager', label: lang === 'ko' ? '과장' : 'Manager' },
+      { value: 'Deputy GM', label: lang === 'ko' ? '차장' : 'Deputy GM' },
+      { value: 'General Manager', label: lang === 'ko' ? '부장' : 'General Manager' },
+      { value: 'Executive', label: lang === 'ko' ? '임원' : 'Executive' },
+    ],
+    [lang]
+  );
+
   useEffect(() => {
     (async () => {
       try {
@@ -302,15 +315,14 @@ export default function RequestForm() {
             <input
               value={form.authorName}
               onChange={(e) => setForm({ ...form, authorName: e.target.value })}
-              placeholder="Enter name"
+              placeholder={t('form_author_placeholder')}
             />
           </Field>
-          <Field label="Job title">
+          <Field label={t('form_job_title')}>
             <select value={form.authorTitle} onChange={(e) => setForm({ ...form, authorTitle: e.target.value })}>
-              <option value="">-</option>
-              {['Staff', 'Assistant Manager', 'Manager', 'Deputy GM', 'General Manager', 'Executive'].map((title) => (
-                <option key={title} value={title}>
-                  {title}
+              {jobTitleOptions.map((title) => (
+                <option key={title.value} value={title.value}>
+                  {title.label}
                 </option>
               ))}
             </select>

@@ -166,7 +166,7 @@ export default function RequestDetail({
                   customerDeadline: item.customerDeadline,
                   createdByUserId: item.createdByUserId,
                   createdByDept: item.createdByDept,
-                  createdByName: item.createdByName ?? '',
+                  createdByName: item.createdByName ?? item.createdByUserId ?? '',
                   rdGroupIds: item.rdGroups.map((x) => x.rdGroup.id),
                 });
               }}
@@ -180,6 +180,8 @@ export default function RequestDetail({
               <button
                 onClick={async () => {
                   if (!draft) return;
+                  const nextAuthorName = (draft.createdByName ?? '').trim();
+                  const nextAuthorId = nextAuthorName || draft.createdByUserId || item.createdByUserId;
                   setSaving(true);
                   try {
                     const payload: any = {
@@ -188,9 +190,9 @@ export default function RequestDetail({
                       customerDeadline: draft.customerDeadline
                         ? new Date(draft.customerDeadline).toISOString()
                         : item.customerDeadline,
-                      createdByUserId: draft.createdByUserId || item.createdByUserId,
+                      createdByUserId: nextAuthorId,
                       createdByDept: draft.createdByDept || item.createdByDept,
-                      createdByName: draft.createdByName ?? item.createdByName ?? '',
+                      createdByName: nextAuthorName || item.createdByName || '',
                       salesSummary: draft.salesSummary ?? item.salesSummary,
                       rawCustomerText: draft.rawCustomerText ?? item.rawCustomerText,
                       rdGroupIds: draft.rdGroupIds ?? item.rdGroups.map((x) => x.rdGroup.id),
@@ -262,7 +264,10 @@ export default function RequestDetail({
         <InfoRow label="작성자" value={editing ? (
           <input
             value={draft?.createdByName ?? draft?.createdByUserId ?? item.createdByName ?? item.createdByUserId}
-            onChange={(e) => setDraft({ ...draft, createdByName: e.target.value, createdByUserId: item.createdByUserId })}
+            onChange={(e) => {
+              const next = e.target.value;
+              setDraft({ ...draft, createdByName: next, createdByUserId: next });
+            }}
           />
         ) : (item.createdByName || item.createdByUserId)} />
       </div>
