@@ -196,7 +196,15 @@ export default function RequestList() {
                 setKeyword('');
                 setRdGroupId('');
               }}
-              style={{ padding: '6px 12px', borderRadius: 10, border: '1px solid #d1d5db', background: '#fff', cursor: 'pointer' }}
+              style={{
+                padding: '6px 12px',
+                borderRadius: 10,
+                border: '1px solid #c7d2fe',
+                background: '#fff',
+                cursor: 'pointer',
+                color: '#2563eb',
+                fontWeight: 700,
+              }}
             >
               Clear
             </button>
@@ -525,6 +533,8 @@ export default function RequestList() {
                   borderRadius: 10,
                   padding: '6px 10px',
                   cursor: 'pointer',
+                  color: '#111827',
+                  fontWeight: 700,
                 }}
               >
                 Close
