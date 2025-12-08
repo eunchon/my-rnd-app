@@ -300,7 +300,8 @@ router.get('/stats/rd-groups', async (_req, res) => {
 // Stage transition stats over recent window
 router.get('/stats/updates', async (req, res) => {
   const daysParam = Number(req.query.days || 7);
-  const windowDays = Number.isFinite(daysParam) && daysParam > 0 ? Math.min(90, Math.max(1, daysParam)) : 7;
+  // allow up to 1 year window so the "last 1 year" dropdown option works
+  const windowDays = Number.isFinite(daysParam) && daysParam > 0 ? Math.min(365, Math.max(1, daysParam)) : 7;
   const start = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000);
 
   const recentHistories = await prisma.stageHistory.findMany({
