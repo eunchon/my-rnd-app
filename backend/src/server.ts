@@ -5,22 +5,9 @@ import requestsRouter from './views/requests';
 import authRouter from './views/auth';
 
 const app = express();
-// CORS: allow configured origins, fallback to allow all (Render/Vercel preflight issues)
-const allowedOrigins = [
-  'http://localhost:3000',
-  'http://localhost:5173',
-  'http://localhost:4173',
-  'https://my-rnd-8dkjoi2tf-eunchons-projects.vercel.app',
-  process.env.CORS_ORIGIN || '',
-].filter(Boolean);
-
+// CORS: allow all origins (front is deployed on Vercel with dynamic domains)
 const corsOptions: cors.CorsOptions = {
-  origin: (origin, cb) => {
-    if (!origin) return cb(null, true); // mobile apps / curl
-    if (allowedOrigins.includes(origin)) return cb(null, true);
-    // fallback allow all to avoid blocked preflight; tighten later if needed
-    return cb(null, true);
-  },
+  origin: true, // reflect request origin
   credentials: true,
   methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
