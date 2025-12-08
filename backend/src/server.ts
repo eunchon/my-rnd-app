@@ -3,6 +3,7 @@ import cors from 'cors';
 import morgan from 'morgan';
 import requestsRouter from './views/requests';
 import authRouter from './views/auth';
+import type { Request, Response } from 'express';
 
 const app = express();
 // CORS: allow all origins (front is deployed on Vercel with dynamic domains)
@@ -18,7 +19,7 @@ app.options('*', cors(corsOptions));
 app.use(express.json());
 app.use(morgan('dev'));
 
-app.get('/health', (_req, res) => {
+app.get('/health', (_req: Request, res: Response) => {
   res.json({ ok: true });
 });
 
