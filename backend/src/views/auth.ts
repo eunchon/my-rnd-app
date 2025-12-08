@@ -25,7 +25,9 @@ const signupSchema = z.object({
   role: z.enum(ROLE_VALUES),
 });
 
-function toPublicUser(user: { id: string; name: string; role: string; organization: string | null; dept: string; email: string }) {
+type PublicUser = { id: string; name: string; role: string; organization: string | null; dept: string; email: string; passwordHash?: string };
+
+function toPublicUser(user: PublicUser) {
   return {
     user_id: user.id,
     name: user.name,
@@ -36,7 +38,7 @@ function toPublicUser(user: { id: string; name: string; role: string; organizati
   };
 }
 
-function signToken(user: { id: string; name: string; role: string; organization: string | null; dept: string; email: string }) {
+function signToken(user: PublicUser) {
   return jwt.sign(
     {
       user_id: user.id,
@@ -118,8 +120,8 @@ router.post('/reset-password', async (req, res) => {
     if (!user || user.email.toLowerCase() !== payload.email?.toLowerCase()) throw new Error('Invalid token');
     const passwordHash = await bcrypt.hash(newPassword, 10);
     await prisma.user.update({ where: { id: user.id }, data: { passwordHash } });
-    const newAuthToken = signToken({ ...user, passwordHash });
-    res.json({ ok: true, token: newAuthToken, user: toPublicUser({ ...user, passwordHash }) });
+    const newAuthToken = signToken(user);
+    res.json({ ok: true, token: newAuthToken, user: toPublicUser(user) });
   } catch (e) {
     return res.status(400).json({ error: 'Invalid or expired token' });
   }
@@ -132,8 +134,8 @@ router.get('/users', authMiddleware, async (req, res) => {
   const users = await prisma.user.findMany({
     where: {
       OR: [
-        { email: { contains: q, mode: 'insensitive' } },
-        { name: { contains: q, mode: 'insensitive' } },
+        { email: { contains: q.toLowerCase() } },
+        { name: { contains: q } },
       ],
     },
     take: 10,

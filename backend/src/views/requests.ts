@@ -123,6 +123,7 @@ const createSchema = z.object({
   currentStatus: z.string().optional(),
   createdByDept: z.string().optional(),
   createdByUserId: z.string().optional(),
+  createdByName: z.string().optional(),
   region: z.string().optional(),
   rawCustomerText: z.string().min(1),
   salesSummary: z.string().min(1),
