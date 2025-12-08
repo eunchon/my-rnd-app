@@ -125,6 +125,12 @@ export default function Dashboard() {
 
   const activeRequests = useMemo(() => requests.filter((r) => !['RELEASE', 'REJECTED'].includes(r.currentStage)), [requests]);
   const activeScored = useMemo(() => scored.filter((r) => !['RELEASE', 'REJECTED'].includes(r.currentStage)), [scored]);
+  const completedRevenue = useMemo(() => {
+    const year = new Date().getFullYear();
+    return requests
+      .filter((r) => r.currentStage === 'RELEASE' && new Date(r.submittedAt).getFullYear() === year)
+      .reduce((s, r) => s + (r.expectedRevenue || 0), 0);
+  }, [requests]);
 
   return (
     <>
@@ -232,16 +238,19 @@ export default function Dashboard() {
           style={{ background: '#e2f8f0', cursor: 'pointer' }}
           onClick={() =>
             setModal({
-              title: 'Expected Revenue',
-              items: scored.sort((a, b) => (b._rev || 0) - (a._rev || 0)),
+              title: 'Expected Revenue (Completed this year)',
+              items: requests
+                .filter((r) => r.currentStage === 'RELEASE' && new Date(r.submittedAt).getFullYear() === new Date().getFullYear())
+                .map((r) => scored.find((s) => s.id === r.id) || r)
+                .sort((a, b) => (b._rev || b.expectedRevenue || 0) - (a._rev || a.expectedRevenue || 0)),
             })
           }
         >
           <div className="section-title">Expected Revenue</div>
           <div style={{ fontSize: 24, fontWeight: 800, color: '#047857' }}>
-            {formatKRW(activeScored.reduce((s, r) => s + (r._rev || 0), 0))}
+            {formatKRW(completedRevenue)}
           </div>
-          <div className="muted">Total expected revenue (descending)</div>
+          <div className="muted">완료된 R&D의 연간 예상 매출</div>
         </div>
       </div>
 
