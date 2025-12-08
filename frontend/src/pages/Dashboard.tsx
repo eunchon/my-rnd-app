@@ -47,6 +47,10 @@ export default function Dashboard() {
   });
   const [transitionWindow, setTransitionWindow] = useState<number>(7);
   const [transitionStats, setTransitionStats] = useState<{ windowDays: number; transitions: any[] }>({ windowDays: 7, transitions: [] });
+  const transitionsEmpty = useMemo(
+    () => transitionStats.transitions.every((t) => !t.items?.length),
+    [transitionStats]
+  );
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -152,7 +156,7 @@ export default function Dashboard() {
             <label>{t('filter_stage_all')}</label>
             <select value={stage} onChange={e=>setStage(e.target.value)}>
               <option value="">{t('filter_stage_all')}</option>
-              {(['IDEATION','REVIEW','CONFIRM','PROJECT','REJECTED'] as const).map(s=> <option key={s} value={s}>{s}</option>)}
+              {(['IDEATION','REVIEW','CONFIRM','PROJECT','RELEASE','REJECTED'] as const).map(s=> <option key={s} value={s}>{stageLabel(s)}</option>)}
             </select>
           </div>
           <div className="grid grid-2">
@@ -172,7 +176,7 @@ export default function Dashboard() {
         <div className="card"><div className="section-title">{t('kpi_total_requests')}</div><div style={{ fontSize: 28, fontWeight: 700 }}>{kpis.totalThisYear}</div></div>
         <div className="card"><div className="section-title">{t('kpi_by_stage')}</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8 }}>
-            {(['IDEATION','REVIEW','CONFIRM','PROJECT','REJECTED'] as const).map((st) => (
+            {(['IDEATION','REVIEW','CONFIRM','PROJECT','RELEASE','REJECTED'] as const).map((st) => (
               <div key={st}><div className="muted">{stageLabel(st)}</div><div style={{ fontWeight: 600 }}>{(kpis.byStage as any)[st] || 0}</div></div>
             ))}
           </div>
@@ -264,27 +268,35 @@ export default function Dashboard() {
           >
             <option value={7}>최근 1주</option>
             <option value={30}>최근 1달</option>
+            <option value={365}>최근 1년</option>
           </select>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10 }}>
-          {transitionStats.transitions.map((t) => (
-            <div
-              key={t.key}
-              onClick={() => setUpdatesModal({ title: `${t.label} (${t.items.length})`, items: t.items })}
-              style={{
-                border: '1px solid #e5e7eb',
-                borderRadius: 12,
-                padding: '10px 12px',
-                cursor: 'pointer',
-                background: '#f8fafc',
-              }}
-            >
-              <div style={{ fontSize: 12, color: '#475569', marginBottom: 4 }}>{t.label}</div>
-              <div style={{ fontSize: 20, fontWeight: 800, color: '#0f172a' }}>{t.items.length}</div>
-              <div style={{ fontSize: 11, color: '#94a3b8' }}>최근 {transitionStats.windowDays}일</div>
-            </div>
-          ))}
-        </div>
+        {transitionsEmpty && (
+          <div style={{ padding: '10px 12px', border: '1px dashed #e2e8f0', borderRadius: 10, color: '#475569', fontSize: 13 }}>
+            선택한 기간(최근 {transitionStats.windowDays}일)에 단계 업데이트가 없습니다.
+          </div>
+        )}
+        {!transitionsEmpty && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10 }}>
+            {transitionStats.transitions.map((t) => (
+              <div
+                key={t.key}
+                onClick={() => setUpdatesModal({ title: `${t.label} (${t.items.length})`, items: t.items })}
+                style={{
+                  border: '1px solid #e5e7eb',
+                  borderRadius: 12,
+                  padding: '10px 12px',
+                  cursor: 'pointer',
+                  background: '#f8fafc',
+                }}
+              >
+                <div style={{ fontSize: 12, color: '#475569', marginBottom: 4 }}>{t.label}</div>
+                <div style={{ fontSize: 20, fontWeight: 800, color: '#0f172a' }}>{t.items.length}</div>
+                <div style={{ fontSize: 11, color: '#94a3b8' }}>최근 {transitionStats.windowDays}일</div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <ImpactRiskBubble
