@@ -5,7 +5,23 @@ import requestsRouter from './views/requests';
 import authRouter from './views/auth';
 
 const app = express();
-app.use(cors());
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'http://localhost:4173',
+  'https://my-rnd-8dkjoi2tf-eunchons-projects.vercel.app',
+  process.env.CORS_ORIGIN || '',
+].filter(Boolean);
+
+app.use(
+  cors({
+    origin: allowedOrigins,
+    credentials: true,
+    methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  })
+);
+app.options('*', cors());
 app.use(express.json());
 app.use(morgan('dev'));
 
