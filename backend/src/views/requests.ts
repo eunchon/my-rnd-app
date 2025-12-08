@@ -331,7 +331,7 @@ router.patch('/:id', authMiddleware, requireRole(['ADMIN', 'EXEC', 'RD', 'SALES'
   const allowedKeys = [
     'title', 'customerName', 'productArea', 'productModel', 'category', 'expectedRevenue', 'importanceFlag',
     'customerDeadline', 'currentStage', 'currentStatus', 'region', 'rawCustomerText', 'salesSummary',
-    'revenueEstimateStatus', 'revenueEstimateNote', 'createdByUserId', 'createdByDept', 'createdByName'
+    'revenueEstimateStatus', 'revenueEstimateNote', 'createdByDept', 'createdByName'
   ];
   for (const k of allowedKeys) {
     if (body[k] !== undefined && body[k] !== null) {
@@ -339,6 +339,11 @@ router.patch('/:id', authMiddleware, requireRole(['ADMIN', 'EXEC', 'RD', 'SALES'
       else if (k === 'expectedRevenue') data[k] = body[k] === '' ? null : BigInt(body[k]);
       else data[k] = body[k];
     }
+  }
+  // Keep createdByUserId stable to avoid breaking the relation; only update display name
+  if (typeof body.createdByName === 'string') {
+    const name = body.createdByName.trim();
+    data.createdByName = name.length ? name : existing.createdByName;
   }
   const newRdGroups: string[] | undefined = Array.isArray(body.rdGroupIds) ? body.rdGroupIds : undefined;
   const stageChanged = body.currentStage && body.currentStage !== existing.currentStage;

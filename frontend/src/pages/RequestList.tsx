@@ -42,6 +42,7 @@ export default function RequestList() {
   const [areas, setAreas] = useState<string[]>([]);
   const [keyword, setKeyword] = useState<string>(() => new URLSearchParams(window.location.search).get('keyword') || '');
   const [rdGroupId, setRdGroupId] = useState<string>(() => new URLSearchParams(window.location.search).get('rdGroupId') || '');
+  const [sortBy, setSortBy] = useState<'deadline' | 'revenue' | 'newest'>('deadline');
   const [total, setTotal] = useState(0);
   const PAGE_SIZE = 10;
   const [page, setPage] = useState(1);
@@ -56,10 +57,31 @@ export default function RequestList() {
     });
   }, [items, stages, areas]);
 
-  const pagedItems = useMemo(() => {
+  const sortedItems = useMemo(() => {
+    const list = [...filteredItems];
+    list.sort((a, b) => {
+      if (sortBy === 'deadline') {
+        const ad = new Date(a.customerDeadline).getTime();
+        const bd = new Date(b.customerDeadline).getTime();
+        return ad - bd;
+      }
+      if (sortBy === 'revenue') {
+        const av = a.expectedRevenue ?? -Infinity;
+        const bv = b.expectedRevenue ?? -Infinity;
+        return bv - av;
+      }
+      // newest
+      const as = new Date(a.submittedAt).getTime();
+      const bs = new Date(b.submittedAt).getTime();
+      return bs - as;
+    });
+    return list;
+  }, [filteredItems, sortBy]);
+
+  const sortedPagedItems = useMemo(() => {
     const start = (page - 1) * PAGE_SIZE;
-    return filteredItems.slice(start, start + PAGE_SIZE);
-  }, [filteredItems, page]);
+    return sortedItems.slice(start, start + PAGE_SIZE);
+  }, [sortedItems, page]);
 
   const totalPages = Math.max(1, Math.ceil(filteredItems.length / PAGE_SIZE));
   const canPrev = page > 1;
@@ -322,10 +344,22 @@ export default function RequestList() {
             >
               {t('pagination_next')}
             </button>
+            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 12, color: '#475569', fontWeight: 600 }}>정렬</span>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as any)}
+                style={{ padding: '8px 10px', borderRadius: 10, border: '1px solid #d0d7e6' }}
+              >
+                <option value="deadline">마감일 임박순</option>
+                <option value="revenue">매출액 높은순</option>
+                <option value="newest">신규 요청 최신순</option>
+              </select>
+            </div>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {pagedItems.map((r) => {
+            {sortedPagedItems.map((r) => {
               const deadline = new Date(r.customerDeadline);
               const daysLeft = Math.ceil((deadline.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
               const badgeColor =
