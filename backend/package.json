@@ -5,7 +5,7 @@
   "type": "commonjs",
   "scripts": {
     "dev": "vite",
-    "build": "prisma generate && npx tsc -b && vite build",
+    "build": "npx prisma generate && npx tsc -b && vite build",
     "start": "node dist/server.js",
     "prisma:migrate": "prisma migrate dev --name init",
     "prisma:generate": "prisma generate",
@@ -29,6 +29,7 @@
     "@types/node": "^20.11.30",
     "prisma": "^5.14.0",
     "tsx": "^4.16.2",
-    "typescript": "^5.6.3"
+    "typescript": "^5.6.3",
+    "vite": "^5.4.0"
   }
 }

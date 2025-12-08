@@ -29,6 +29,7 @@ export default function Dashboard() {
   const [rdGroupLoad, setRdGroupLoad] = useState<any[]>([]);
   const [scored, setScored] = useState<any[]>([]);
   const [modal, setModal] = useState<{ title: string; items: any[] } | null>(null);
+  const [updatesModal, setUpdatesModal] = useState<{ title: string; items: any[] } | null>(null);
   const [urgentOnly, setUrgentOnly] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     const v = localStorage.getItem('dash_urgentOnly');
@@ -44,6 +45,8 @@ export default function Dashboard() {
     const v = Number(localStorage.getItem('dash_urgentDays'));
     return [7, 14, 21].includes(v) ? v : 14;
   });
+  const [transitionWindow, setTransitionWindow] = useState<number>(7);
+  const [transitionStats, setTransitionStats] = useState<{ windowDays: number; transitions: any[] }>({ windowDays: 7, transitions: [] });
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -68,8 +71,14 @@ export default function Dashboard() {
     setLoading(false);
   }
 
+  async function loadTransitions(windowDays: number) {
+    const data = await fetchJSON<{ windowDays: number; transitions: any[] }>(`/requests/stats/updates?days=${windowDays}`);
+    setTransitionStats(data);
+  }
+
   useEffect(() => { loadData(); }, []);
   useEffect(() => { loadData(); }, [productArea, stage, fromDate, toDate]);
+  useEffect(() => { loadTransitions(transitionWindow); }, [transitionWindow]);
 
   const kpis = useMemo(() => {
     const now = new Date();
@@ -92,7 +101,7 @@ export default function Dashboard() {
       CONFIRM: t('stages_CONFIRM'),
       PROJECT: t('stages_PROJECT'),
       REJECTED: t('stages_REJECTED'),
-      RELEASE: t('stages_RELEASE'),
+      RELEASE: 'COMPLETE',
     };
     return map[code] || code;
   }
@@ -113,6 +122,9 @@ export default function Dashboard() {
     });
     setScored(enriched);
   }, [requests]);
+
+  const activeRequests = useMemo(() => requests.filter((r) => !['RELEASE', 'REJECTED'].includes(r.currentStage)), [requests]);
+  const activeScored = useMemo(() => scored.filter((r) => !['RELEASE', 'REJECTED'].includes(r.currentStage)), [scored]);
 
   return (
     <>
@@ -169,7 +181,7 @@ export default function Dashboard() {
           onClick={() =>
             setModal({
               title: 'Strategic Priority',
-              items: scored
+              items: activeScored
                 .filter((r) => r.importanceFlag === 'MUST' && (r._influence || 0) >= 6)
                 .sort((a, b) => (b._influence || 0) - (a._influence || 0)),
             })
@@ -177,7 +189,7 @@ export default function Dashboard() {
         >
           <div className="section-title" style={{ color: '#e2e8f0' }}>Strategic Priority</div>
           <div style={{ fontSize: 28, fontWeight: 800, color: '#fff' }}>
-            {scored.filter((r) => r.importanceFlag === 'MUST' && (r._influence || 0) >= 6).length}
+            {activeScored.filter((r) => r.importanceFlag === 'MUST' && (r._influence || 0) >= 6).length}
           </div>
           <div className="muted" style={{ color: '#e2e8f0' }}>MUST + influence 6+ (sorted by influence)</div>
         </div>
@@ -187,13 +199,13 @@ export default function Dashboard() {
           onClick={() =>
             setModal({
               title: 'Top Revenue 5',
-              items: scored.slice().sort((a, b) => (b._rev || 0) - (a._rev || 0)).slice(0, 5),
+              items: activeScored.slice().sort((a, b) => (b._rev || 0) - (a._rev || 0)).slice(0, 5),
             })
           }
         >
           <div className="section-title" style={{ color: '#e0f2fe' }}>Top Revenue 5</div>
           <div style={{ fontSize: 28, fontWeight: 800, color: '#fff' }}>
-            {Math.min(5, scored.length)}
+            {Math.min(5, activeScored.length)}
           </div>
           <div className="muted" style={{ color: '#e0f2fe' }}>Top 5 by expected revenue</div>
         </div>
@@ -227,14 +239,47 @@ export default function Dashboard() {
         >
           <div className="section-title">Expected Revenue</div>
           <div style={{ fontSize: 24, fontWeight: 800, color: '#047857' }}>
-            {formatKRW(scored.reduce((s, r) => s + (r._rev || 0), 0))}
+            {formatKRW(activeScored.reduce((s, r) => s + (r._rev || 0), 0))}
           </div>
           <div className="muted">Total expected revenue (descending)</div>
         </div>
       </div>
 
+      <div className="card" style={{ marginTop: 8 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+          <div className="section-title">R&D 요청 업데이트 현황</div>
+          <select
+            value={transitionWindow}
+            onChange={(e) => setTransitionWindow(Number(e.target.value))}
+            style={{ padding: '6px 10px', borderRadius: 10, border: '1px solid #e2e8f0' }}
+          >
+            <option value={7}>최근 1주</option>
+            <option value={30}>최근 1달</option>
+          </select>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10 }}>
+          {transitionStats.transitions.map((t) => (
+            <div
+              key={t.key}
+              onClick={() => setUpdatesModal({ title: `${t.label} (${t.items.length})`, items: t.items })}
+              style={{
+                border: '1px solid #e5e7eb',
+                borderRadius: 12,
+                padding: '10px 12px',
+                cursor: 'pointer',
+                background: '#f8fafc',
+              }}
+            >
+              <div style={{ fontSize: 12, color: '#475569', marginBottom: 4 }}>{t.label}</div>
+              <div style={{ fontSize: 20, fontWeight: 800, color: '#0f172a' }}>{t.items.length}</div>
+              <div style={{ fontSize: 11, color: '#94a3b8' }}>최근 {transitionStats.windowDays}일</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
       <ImpactRiskBubble
-        data={scored}
+        data={activeScored}
         productArea={productArea}
       />
 
@@ -361,6 +406,65 @@ export default function Dashboard() {
                 </div>
               ))}
             {modal.items.length === 0 && <div style={{ color: '#6b7280' }}>No items match this criteria.</div>}
+          </div>
+        </div>
+      </div>
+    )}
+    {updatesModal && (
+      <div
+        style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.45)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 999,
+        }}
+        onClick={() => setUpdatesModal(null)}
+      >
+        <div
+          style={{
+            background: '#fff',
+            borderRadius: 12,
+            padding: 16,
+            width: 'min(720px, 90vw)',
+            maxHeight: '70vh',
+            overflowY: 'auto',
+            boxShadow: '0 16px 40px rgba(0,0,0,0.15)',
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <div style={{ fontWeight: 800, fontSize: 16 }}>{updatesModal.title}</div>
+            <button onClick={() => setUpdatesModal(null)} style={{ padding: '4px 8px' }}>Close</button>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 8 }}>
+            {updatesModal.items.map((r: any) => (
+              <div
+                key={r.requestId + String(r.enteredAt)}
+                onClick={() => {
+                  setUpdatesModal(null);
+                  navigate(`/request/${r.requestId}`);
+                }}
+                style={{
+                  border: '1px solid #e5e7eb',
+                  borderRadius: 10,
+                  padding: 10,
+                  background: '#f8fafc',
+                  cursor: 'pointer',
+                }}
+              >
+                <div style={{ fontWeight: 700, marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.title}</div>
+                <div style={{ fontSize: 12, color: '#475569', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <span>{r.customerName}</span>
+                  <span>{r.productArea}</span>
+                  <span>{(r.fromStage ? stageLabel(r.fromStage) : '시작')} → {stageLabel(r.toStage)}</span>
+                  <span>{new Date(r.enteredAt).toLocaleDateString()}</span>
+                </div>
+              </div>
+            ))}
+            {updatesModal.items.length === 0 && <div style={{ color: '#6b7280' }}>No items in this window.</div>}
           </div>
         </div>
       </div>

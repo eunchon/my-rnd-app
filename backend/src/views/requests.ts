@@ -297,6 +297,85 @@ router.get('/stats/rd-groups', async (_req, res) => {
   res.json(data);
 });
 
+// Stage transition stats over recent window
+router.get('/stats/updates', async (req, res) => {
+  const daysParam = Number(req.query.days || 7);
+  const windowDays = Number.isFinite(daysParam) && daysParam > 0 ? Math.min(90, Math.max(1, daysParam)) : 7;
+  const start = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000);
+
+  const recentHistories = await prisma.stageHistory.findMany({
+    where: { enteredAt: { gte: start } },
+    orderBy: [{ requestId: 'asc' }, { enteredAt: 'asc' }],
+    include: {
+      request: { select: { id: true, title: true, customerName: true, productArea: true, currentStage: true } },
+    },
+  });
+
+  const requestIds = Array.from(new Set(recentHistories.map((h) => h.requestId)));
+  if (requestIds.length === 0) return res.json({ windowDays, transitions: [] });
+
+  const allHistories = await prisma.stageHistory.findMany({
+    where: { requestId: { in: requestIds } },
+    orderBy: [{ requestId: 'asc' }, { enteredAt: 'asc' }],
+  });
+
+  type BucketKey = 'IDEATION_TO_REVIEW' | 'REVIEW_TO_CONFIRM' | 'CONFIRM_TO_PROJECT' | 'PROJECT_TO_RELEASE' | 'ANY_TO_REJECTED';
+  const buckets: Record<BucketKey, any[]> = {
+    IDEATION_TO_REVIEW: [],
+    REVIEW_TO_CONFIRM: [],
+    CONFIRM_TO_PROJECT: [],
+    PROJECT_TO_RELEASE: [],
+    ANY_TO_REJECTED: [],
+  };
+
+  const byRequest = new Map<string, typeof allHistories>();
+  for (const h of allHistories) {
+    if (!byRequest.has(h.requestId)) byRequest.set(h.requestId, []);
+    byRequest.get(h.requestId)!.push(h);
+  }
+
+  for (const [reqId, histories] of byRequest.entries()) {
+    histories.sort((a, b) => new Date(a.enteredAt).getTime() - new Date(b.enteredAt).getTime());
+    let prevStage: string | null = null;
+    for (const h of histories) {
+      const enteredAt = new Date(h.enteredAt);
+      if (enteredAt < start) {
+        prevStage = h.stage;
+        continue;
+      }
+      const from = prevStage;
+      const to = h.stage;
+      const info = recentHistories.find((x) => x.id === h.id)?.request;
+      const record = {
+        requestId: reqId,
+        title: info?.title || '',
+        customerName: info?.customerName || '',
+        productArea: info?.productArea || '',
+        currentStage: info?.currentStage || to,
+        fromStage: from,
+        toStage: to,
+        enteredAt,
+      };
+      if (from === 'IDEATION' && to === 'REVIEW') buckets.IDEATION_TO_REVIEW.push(record);
+      if (from === 'REVIEW' && to === 'CONFIRM') buckets.REVIEW_TO_CONFIRM.push(record);
+      if (from === 'CONFIRM' && to === 'PROJECT') buckets.CONFIRM_TO_PROJECT.push(record);
+      if (from === 'PROJECT' && to === 'RELEASE') buckets.PROJECT_TO_RELEASE.push(record);
+      if (to === 'REJECTED') buckets.ANY_TO_REJECTED.push(record);
+      prevStage = to;
+    }
+  }
+
+  const transitions = [
+    { key: 'IDEATION_TO_REVIEW', label: 'Ideation \u2192 Review', items: buckets.IDEATION_TO_REVIEW },
+    { key: 'REVIEW_TO_CONFIRM', label: 'Review \u2192 Confirm', items: buckets.REVIEW_TO_CONFIRM },
+    { key: 'CONFIRM_TO_PROJECT', label: 'Confirm \u2192 Project', items: buckets.CONFIRM_TO_PROJECT },
+    { key: 'PROJECT_TO_RELEASE', label: 'Project \u2192 Complete', items: buckets.PROJECT_TO_RELEASE },
+    { key: 'ANY_TO_REJECTED', label: 'Rejected (any stage)', items: buckets.ANY_TO_REJECTED },
+  ];
+
+  res.json({ windowDays, transitions });
+});
+
 // RD groups list (for frontend to render checkboxes with IDs)
 router.get('/rd-groups', async (_req, res) => {
   const groups = await prisma.rDGroup.findMany({ orderBy: { name: 'asc' } });

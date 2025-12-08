@@ -119,9 +119,9 @@ router.post('/reset-password', async (req, res) => {
     const user = await prisma.user.findUnique({ where: { id: payload.user_id } });
     if (!user || user.email.toLowerCase() !== payload.email?.toLowerCase()) throw new Error('Invalid token');
     const passwordHash = await bcrypt.hash(newPassword, 10);
-    await prisma.user.update({ where: { id: user.id }, data: { passwordHash } });
-    const newAuthToken = signToken(user);
-    res.json({ ok: true, token: newAuthToken, user: toPublicUser(user) });
+    const updated = await prisma.user.update({ where: { id: user.id }, data: { passwordHash } });
+    const newAuthToken = signToken(updated);
+    res.json({ ok: true, token: newAuthToken, user: toPublicUser(updated) });
   } catch (e) {
     return res.status(400).json({ error: 'Invalid or expired token' });
   }
