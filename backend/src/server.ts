@@ -8,8 +8,8 @@ import type { Request, Response } from 'express';
 const app = express();
 // CORS: allow all origins (front is deployed on Vercel with dynamic domains)
 const corsOptions: cors.CorsOptions = {
-  origin: true, // reflect request origin
-  credentials: true,
+  origin: '*',
+  credentials: false,
   methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 };
@@ -27,7 +27,7 @@ app.get('/health', (_req: Request, res: Response) => {
 app.use('/auth', authRouter);
 app.use('/requests', requestsRouter);
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
   console.log(`Backend listening on http://localhost:${PORT}`);
 });
