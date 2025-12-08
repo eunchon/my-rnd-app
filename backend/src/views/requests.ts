@@ -366,12 +366,25 @@ router.get('/stats/updates', async (req, res) => {
     }
   }
 
+  // keep only the latest transition per request for each bucket
+  const keepLatest = (items: any[]) => {
+    const byReq = new Map<string, any>();
+    for (const item of items) {
+      const ts = new Date(item.enteredAt).getTime();
+      const existing = byReq.get(item.requestId);
+      if (!existing || ts > new Date(existing.enteredAt).getTime()) {
+        byReq.set(item.requestId, item);
+      }
+    }
+    return Array.from(byReq.values()).sort((a, b) => new Date(b.enteredAt).getTime() - new Date(a.enteredAt).getTime());
+  };
+
   const transitions = [
-    { key: 'IDEATION_TO_REVIEW', label: 'Ideation \u2192 Review', items: buckets.IDEATION_TO_REVIEW },
-    { key: 'REVIEW_TO_CONFIRM', label: 'Review \u2192 Confirm', items: buckets.REVIEW_TO_CONFIRM },
-    { key: 'CONFIRM_TO_PROJECT', label: 'Confirm \u2192 Project', items: buckets.CONFIRM_TO_PROJECT },
-    { key: 'PROJECT_TO_RELEASE', label: 'Project \u2192 Complete', items: buckets.PROJECT_TO_RELEASE },
-    { key: 'ANY_TO_REJECTED', label: 'Rejected (any stage)', items: buckets.ANY_TO_REJECTED },
+    { key: 'IDEATION_TO_REVIEW', label: 'Ideation \u2192 Review', items: keepLatest(buckets.IDEATION_TO_REVIEW) },
+    { key: 'REVIEW_TO_CONFIRM', label: 'Review \u2192 Confirm', items: keepLatest(buckets.REVIEW_TO_CONFIRM) },
+    { key: 'CONFIRM_TO_PROJECT', label: 'Confirm \u2192 Project', items: keepLatest(buckets.CONFIRM_TO_PROJECT) },
+    { key: 'PROJECT_TO_RELEASE', label: 'Project \u2192 Complete', items: keepLatest(buckets.PROJECT_TO_RELEASE) },
+    { key: 'ANY_TO_REJECTED', label: 'Rejected (any stage)', items: keepLatest(buckets.ANY_TO_REJECTED) },
   ];
 
   res.json({ windowDays, transitions });
