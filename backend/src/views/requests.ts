@@ -303,6 +303,11 @@ router.get('/stats/updates', async (req, res) => {
   // allow up to 1 year window so the "last 1 year" dropdown option works
   const windowDays = Number.isFinite(daysParam) && daysParam > 0 ? Math.min(365, Math.max(1, daysParam)) : 7;
   const start = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000);
+  // Normalize stage naming inconsistencies: COMPLETE was used interchangeably with RELEASE
+  const normalizeStage = (stage: string | null) => {
+    if (!stage) return stage;
+    return stage === 'COMPLETE' ? 'RELEASE' : stage;
+  };
 
   const recentHistories = await prisma.stageHistory.findMany({
     where: { enteredAt: { gte: start } },
@@ -340,12 +345,13 @@ router.get('/stats/updates', async (req, res) => {
     let prevStage: string | null = null;
     for (const h of histories) {
       const enteredAt = new Date(h.enteredAt);
+      const normalizedCurrent = normalizeStage(h.stage);
       if (enteredAt < start) {
-        prevStage = h.stage;
+        prevStage = normalizedCurrent;
         continue;
       }
-      const from = prevStage;
-      const to = h.stage;
+      const from = normalizeStage(prevStage);
+      const to = normalizedCurrent;
       const info = recentHistories.find((x) => x.id === h.id)?.request;
       const record = {
         requestId: reqId,
