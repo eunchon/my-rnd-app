@@ -427,6 +427,14 @@ router.patch('/:id', authMiddleware, requireRole(['ADMIN', 'EXEC', 'RD', 'SALES'
     'customerDeadline', 'currentStage', 'currentStatus', 'region', 'rawCustomerText', 'salesSummary',
     'revenueEstimateStatus', 'revenueEstimateNote', 'createdByDept', 'createdByName'
   ];
+  const keywords: string[] | undefined = Array.isArray(body.keywords) ? body.keywords : undefined;
+  const techAreas: Array<{ groupName?: string | null; code?: string | null; label?: string | null }> | undefined =
+    Array.isArray(body.techAreas) ? body.techAreas : undefined;
+  const attachments: Array<{ filename: string; url?: string }> | undefined = Array.isArray(body.attachments)
+    ? body.attachments
+    : undefined;
+  const technicalNotesProvided = Object.prototype.hasOwnProperty.call(body, 'technicalNotes');
+  const technicalNotes = typeof body.technicalNotes === 'string' ? body.technicalNotes : null;
   for (const k of allowedKeys) {
     if (body[k] !== undefined && body[k] !== null) {
       if (k === 'customerDeadline') data[k] = new Date(body[k]);
@@ -450,6 +458,44 @@ router.patch('/:id', authMiddleware, requireRole(['ADMIN', 'EXEC', 'RD', 'SALES'
       await tx.stageHistory.updateMany({ where: { requestId: id, exitedAt: null }, data: { exitedAt: now } });
       await tx.stageHistory.create({ data: { requestId: id, stage: body.currentStage, enteredAt: now, exitedAt: null } });
     }
+    if (keywords) {
+      await tx.requestKeyword.deleteMany({ where: { requestId: id } });
+      if (keywords.length) {
+        await tx.requestKeyword.createMany({
+          data: keywords.filter(Boolean).map((k) => ({ requestId: id, keyword: k })),
+        });
+      }
+    }
+    if (attachments) {
+      await tx.requestAttachment.deleteMany({ where: { requestId: id } });
+      if (attachments.length) {
+        await tx.requestAttachment.createMany({
+          data: attachments.map((a) => ({
+            requestId: id,
+            filename: a.filename,
+            url: a.url ?? null,
+          })),
+        });
+      }
+    }
+    if (techAreas || technicalNotesProvided) {
+      await tx.requestTechArea.deleteMany({ where: { requestId: id } });
+      const techAreasCreate = [...(techAreas ?? [])];
+      const note = technicalNotes?.trim();
+      if (note) {
+        techAreasCreate.push({ groupName: 'Notes', code: 'NOTE', label: note });
+      }
+      if (techAreasCreate.length) {
+        await tx.requestTechArea.createMany({
+          data: techAreasCreate.map((t) => ({
+            requestId: id,
+            groupName: t.groupName ?? 'Notes',
+            code: t.code ?? 'NOTE',
+            label: t.label ?? '',
+          })),
+        });
+      }
+    }
     if (newRdGroups) {
       await tx.requestRDGroup.deleteMany({ where: { requestId: id } });
       if (newRdGroups.length) {
@@ -460,7 +506,20 @@ router.patch('/:id', authMiddleware, requireRole(['ADMIN', 'EXEC', 'RD', 'SALES'
     }
   });
   const updated = await prisma.request.findUnique({ where: { id }, include: detailInclude });
-  res.json(updated ? { ...updated, expectedRevenue: toNumber(updated.expectedRevenue) } : updated);
+  res.json(
+    updated
+      ? {
+          ...updated,
+          expectedRevenue: toNumber(updated.expectedRevenue),
+          technicalNotes: updated.techAreas?.find((t) => t.code === 'NOTE')?.label ?? null,
+          customerInfluenceScore: (() => {
+            const raw = updated.techAreas?.find((t) => t.code === 'INF_SCORE')?.label;
+            const num = raw ? Number(raw) : null;
+            return Number.isFinite(num) ? num : null;
+          })(),
+        }
+      : updated
+  );
 });
 
 // Delete request (admin tool)
