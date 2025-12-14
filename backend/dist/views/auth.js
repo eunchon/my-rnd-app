@@ -86,6 +86,59 @@ router.post('/login', async (req, res) => {
     const token = signToken(user);
     res.json({ token, user: toPublicUser(user) });
 });
+// Forgot password: issue a short-lived reset token (demo: return token directly)
+router.post('/forgot-password', async (req, res) => {
+    const email = (req.body?.email || '').toString().trim().toLowerCase();
+    if (!email)
+        return res.status(400).json({ error: 'Email required' });
+    const user = await db_1.prisma.user.findUnique({ where: { email } });
+    if (!user)
+        return res.status(404).json({ error: 'User not found' });
+    const resetToken = jsonwebtoken_1.default.sign({ user_id: user.id, email: user.email, type: 'reset' }, JWT_SECRET, { expiresIn: '30m' });
+    // In production: send email with reset link. For now, return token to client.
+    res.json({ ok: true, resetToken, expiresInMinutes: 30 });
+});
+// Reset password using reset token
+router.post('/reset-password', async (req, res) => {
+    const { token, newPassword } = req.body || {};
+    if (!token || typeof token !== 'string')
+        return res.status(400).json({ error: 'Token required' });
+    if (!newPassword || typeof newPassword !== 'string' || newPassword.length < 6) {
+        return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    }
+    try {
+        const payload = jsonwebtoken_1.default.verify(token, JWT_SECRET);
+        if (payload?.type !== 'reset' || !payload?.user_id)
+            throw new Error('Invalid token');
+        const user = await db_1.prisma.user.findUnique({ where: { id: payload.user_id } });
+        if (!user || user.email.toLowerCase() !== payload.email?.toLowerCase())
+            throw new Error('Invalid token');
+        const passwordHash = await bcryptjs_1.default.hash(newPassword, 10);
+        const updated = await db_1.prisma.user.update({ where: { id: user.id }, data: { passwordHash } });
+        const newAuthToken = signToken(updated);
+        res.json({ ok: true, token: newAuthToken, user: toPublicUser(updated) });
+    }
+    catch (e) {
+        return res.status(400).json({ error: 'Invalid or expired token' });
+    }
+});
+// User search (kept for potential future use)
+router.get('/users', authMiddleware, async (req, res) => {
+    const q = (req.query.q || '').toString().trim();
+    if (!q || q.length < 2)
+        return res.json([]);
+    const users = await db_1.prisma.user.findMany({
+        where: {
+            OR: [
+                { email: { contains: q.toLowerCase() } },
+                { name: { contains: q } },
+            ],
+        },
+        take: 10,
+        select: { id: true, name: true, email: true, dept: true, role: true, organization: true },
+    });
+    res.json(users);
+});
 function authMiddleware(req, res, next) {
     const auth = req.headers.authorization;
     if (!auth || !auth.startsWith('Bearer '))
