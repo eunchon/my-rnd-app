@@ -47,6 +47,8 @@ model Request {
   stageHistory     StageHistory[]
   rdGroups         RequestRDGroup[]
   techAreas        RequestTechArea[]
+  stageTargets     RequestStageTarget[]
+  stageTargetHistory RequestStageTargetHistory[]
 
   // Option C: prioritization, regulatory, KPI & planning fields
   riceReach              Int?
@@ -118,4 +120,30 @@ model RequestAttachment {
   request   Request @relation(fields: [requestId], references: [id])
   filename  String
   url       String?
+}
+
+model RequestStageTarget {
+  id         String   @id @default(cuid())
+  requestId  String
+  request    Request  @relation(fields: [requestId], references: [id])
+  stage      String
+  targetDate DateTime
+  setByUserId String?
+  setByName   String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([requestId, stage])
+}
+
+model RequestStageTargetHistory {
+  id          String   @id @default(cuid())
+  requestId   String
+  request     Request  @relation(fields: [requestId], references: [id])
+  stage       String
+  previousTarget DateTime?
+  newTarget     DateTime
+  changedAt   DateTime @default(now())
+  changedByUserId String?
+  changedByName   String?
 }

@@ -29,6 +29,16 @@ type DetailRequest = {
   techAreas?: { id?: string; groupName?: string | null; code?: string | null; label?: string | null }[];
   technicalNotes?: string | null;
   customerInfluenceScore?: number | null;
+  stageTargets?: { id: string; stage: string; targetDate: string; setByName?: string | null; setByUserId?: string | null }[];
+  stageTargetHistory?: {
+    id: string;
+    stage: string;
+    previousTarget?: string | null;
+    newTarget: string;
+    changedAt: string;
+    changedByName?: string | null;
+    changedByUserId?: string | null;
+  }[];
 };
 
 export default function RequestDetail({
@@ -54,6 +64,9 @@ export default function RequestDetail({
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<any | null>(null);
+  const [targetStage, setTargetStage] = useState<string>('PROJECT');
+  const [targetDate, setTargetDate] = useState<string>('');
+  const [targetSaving, setTargetSaving] = useState(false);
   const [rdGroups, setRdGroups] = useState<{ id: string; name: string; category: string | null }[]>([]);
 
   useEffect(() => {
@@ -335,6 +348,86 @@ export default function RequestDetail({
         </Card>
       )}
       {/* 고객 영향력 점수 및 선택형 기술 요구 섹션 제거 */}
+
+      <Card title="Stage Target Dates">
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 10 }}>
+          <select value={targetStage} onChange={(e) => setTargetStage(e.target.value)} style={{ padding: '6px 8px', borderRadius: 8 }}>
+            {stageOptions.filter((s) => s !== 'REJECTED').map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+          <input
+            type="date"
+            value={targetDate}
+            onChange={(e) => setTargetDate(e.target.value)}
+            style={{ padding: '6px 8px', borderRadius: 8, border: '1px solid #e2e8f0' }}
+          />
+          {!isReadOnly && (
+            <button
+              onClick={async () => {
+                if (!item || !targetStage || !targetDate) return;
+                setTargetSaving(true);
+                try {
+                  const res = await patchJSON<{ target: any; targets: any[]; history: any[] }>(
+                    `/requests/${item.id}/stage-target`,
+                    { stage: targetStage, targetDate: new Date(targetDate).toISOString() }
+                  );
+                  setItem({
+                    ...item,
+                    stageTargets: res.targets,
+                    stageTargetHistory: res.history,
+                  });
+                } catch (e: any) {
+                  setError(e?.message || 'Failed to save target');
+                } finally {
+                  setTargetSaving(false);
+                }
+              }}
+              disabled={targetSaving || !targetDate}
+              style={{ padding: '8px 12px' }}
+            >
+              {targetSaving ? 'Saving...' : 'Save target'}
+            </button>
+          )}
+          {isReadOnly && <span style={{ color: '#64748b', fontSize: 12 }}>View only</span>}
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 8 }}>
+          {(item.stageTargets || []).map((tgt) => (
+            <div key={tgt.id} style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: '8px 10px', background: '#f8fafc' }}>
+              <div style={{ fontSize: 12, color: '#475569' }}>{tgt.stage}</div>
+              <div style={{ fontWeight: 700 }}>{new Date(tgt.targetDate).toLocaleDateString()}</div>
+              <div style={{ fontSize: 11, color: '#94a3b8' }}>
+                {tgt.setByName || tgt.setByUserId ? `by ${tgt.setByName || tgt.setByUserId}` : ''}
+              </div>
+            </div>
+          ))}
+          {(item.stageTargets || []).length === 0 && (
+            <div style={{ color: '#94a3b8', fontSize: 13 }}>No targets set yet.</div>
+          )}
+        </div>
+        <div style={{ marginTop: 12 }}>
+          <div style={{ fontWeight: 700, marginBottom: 4, color: '#0f172a' }}>Change history</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {(item.stageTargetHistory || []).map((h) => (
+              <div key={h.id} style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: '8px 10px', background: '#fff' }}>
+                <div style={{ fontSize: 12, color: '#475569', marginBottom: 2 }}>{h.stage}</div>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 12, flexWrap: 'wrap' }}>
+                  <span style={{ color: '#6b7280' }}>
+                    {h.previousTarget ? new Date(h.previousTarget).toLocaleDateString() : 'unset'} → {new Date(h.newTarget).toLocaleDateString()}
+                  </span>
+                  <span style={{ color: '#94a3b8' }}>{new Date(h.changedAt).toLocaleString()}</span>
+                  {h.changedByName || h.changedByUserId ? (
+                    <span style={{ color: '#94a3b8' }}>by {h.changedByName || h.changedByUserId}</span>
+                  ) : null}
+                </div>
+              </div>
+            ))}
+            {(item.stageTargetHistory || []).length === 0 && (
+              <div style={{ color: '#94a3b8', fontSize: 13 }}>No changes recorded.</div>
+            )}
+          </div>
+        </div>
+      </Card>
 
       <Card title="담당 R&D 그룹">
         {editing ? (

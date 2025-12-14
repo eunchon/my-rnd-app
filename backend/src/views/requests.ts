@@ -12,6 +12,8 @@ const detailInclude: Prisma.RequestInclude = {
   rdGroups: { include: { rdGroup: true } },
   stageHistory: { orderBy: [{ enteredAt: 'asc' as Prisma.SortOrder }] },
   techAreas: true,
+  stageTargets: true,
+  stageTargetHistory: { orderBy: [{ changedAt: 'desc' as Prisma.SortOrder }] },
   attachments: true,
 };
 
@@ -526,6 +528,52 @@ router.patch('/:id', authMiddleware, requireRole(['ADMIN', 'EXEC', 'RD', 'SALES'
         }
       : updated
   );
+});
+
+// Set/update target completion date for a stage (RD/EXEC/ADMIN)
+router.patch('/:id/stage-target', authMiddleware, requireRole(['ADMIN', 'EXEC', 'RD']), async (req: any, res) => {
+  const { id } = req.params;
+  const { stage, targetDate } = req.body || {};
+  if (!stage || !targetDate) return res.status(400).json({ error: 'stage and targetDate required' });
+  const parsed = new Date(targetDate);
+  if (Number.isNaN(parsed.getTime())) return res.status(400).json({ error: 'Invalid targetDate' });
+
+  const request = await prisma.request.findUnique({ where: { id } });
+  if (!request) return res.status(404).json({ error: 'Not found' });
+  const authUser = (req as any).user || {};
+  const setByUserId = authUser.user_id ?? null;
+  const setByName = authUser.name ?? null;
+  const normalizedStage = stage === 'COMPLETE' ? 'RELEASE' : stage;
+
+  const existing = await prisma.requestStageTarget.findUnique({
+    where: { requestId_stage: { requestId: id, stage: normalizedStage } },
+  });
+
+  await prisma.$transaction(async (tx) => {
+    await tx.requestStageTarget.upsert({
+      where: { requestId_stage: { requestId: id, stage: normalizedStage } },
+      update: { targetDate: parsed, setByUserId, setByName },
+      create: { requestId: id, stage: normalizedStage, targetDate: parsed, setByUserId, setByName },
+    });
+    await tx.requestStageTargetHistory.create({
+      data: {
+        requestId: id,
+        stage: normalizedStage,
+        previousTarget: existing?.targetDate ?? null,
+        newTarget: parsed,
+        changedByUserId: setByUserId,
+        changedByName: setByName,
+      },
+    });
+  });
+
+  const targets = await prisma.requestStageTarget.findMany({ where: { requestId: id } });
+  const history = await prisma.requestStageTargetHistory.findMany({
+    where: { requestId: id },
+    orderBy: { changedAt: 'desc' },
+  });
+
+  res.json({ target: targets.find((t) => t.stage === normalizedStage), targets, history });
 });
 
 // Delete request (admin tool)
