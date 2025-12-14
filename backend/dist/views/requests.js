@@ -11,6 +11,8 @@ const detailInclude = {
     rdGroups: { include: { rdGroup: true } },
     stageHistory: { orderBy: [{ enteredAt: 'asc' }] },
     techAreas: true,
+    stageTargets: true,
+    stageTargetHistory: { orderBy: [{ changedAt: 'desc' }] },
     attachments: true,
 };
 // List requests with filters for dashboard
@@ -111,6 +113,7 @@ const createSchema = zod_1.z.object({
     currentStatus: zod_1.z.string().optional(),
     createdByDept: zod_1.z.string().optional(),
     createdByUserId: zod_1.z.string().optional(),
+    createdByName: zod_1.z.string().optional(),
     region: zod_1.z.string().optional(),
     rawCustomerText: zod_1.z.string().min(1),
     salesSummary: zod_1.z.string().min(1),
@@ -139,6 +142,7 @@ router.post('/', auth_1.authMiddleware, (0, auth_1.requireRole)(['SALES', 'EXEC'
     const authUser = req.user;
     const creatorId = authUser?.user_id || data.createdByUserId || 'unknown-user';
     const creatorDept = authUser?.organization || data.createdByDept || 'unknown-dept';
+    const creatorName = authUser?.name || data.createdByName || null;
     const influenceNumbers = [
         data.influenceRevenue ?? 0,
         data.influenceKol ?? 0,
@@ -179,6 +183,7 @@ router.post('/', auth_1.authMiddleware, (0, auth_1.requireRole)(['SALES', 'EXEC'
             currentStatus: data.currentStatus ?? 'SUBMITTED',
             createdByDept: creatorDept,
             createdByUserId: creatorId,
+            createdByName: creatorName,
             region: data.region ?? null,
             rawCustomerText: data.rawCustomerText,
             salesSummary: data.salesSummary,
@@ -270,6 +275,102 @@ router.get('/stats/rd-groups', async (_req, res) => {
     }));
     res.json(data);
 });
+// Stage transition stats over recent window
+router.get('/stats/updates', async (req, res) => {
+    const daysParam = Number(req.query.days || 7);
+    // allow up to 1 year window so the "last 1 year" dropdown option works
+    const windowDays = Number.isFinite(daysParam) && daysParam > 0 ? Math.min(365, Math.max(1, daysParam)) : 7;
+    const start = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000);
+    // Normalize stage naming inconsistencies: COMPLETE was used interchangeably with RELEASE
+    const normalizeStage = (stage) => {
+        if (!stage)
+            return stage;
+        return stage === 'COMPLETE' ? 'RELEASE' : stage;
+    };
+    const recentHistories = await db_1.prisma.stageHistory.findMany({
+        where: { enteredAt: { gte: start } },
+        orderBy: [{ requestId: 'asc' }, { enteredAt: 'asc' }],
+        include: {
+            request: { select: { id: true, title: true, customerName: true, productArea: true, currentStage: true } },
+        },
+    });
+    const requestIds = Array.from(new Set(recentHistories.map((h) => h.requestId)));
+    if (requestIds.length === 0)
+        return res.json({ windowDays, transitions: [] });
+    const allHistories = await db_1.prisma.stageHistory.findMany({
+        where: { requestId: { in: requestIds } },
+        orderBy: [{ requestId: 'asc' }, { enteredAt: 'asc' }],
+    });
+    const buckets = {
+        IDEATION_TO_REVIEW: [],
+        REVIEW_TO_CONFIRM: [],
+        CONFIRM_TO_PROJECT: [],
+        PROJECT_TO_RELEASE: [],
+        ANY_TO_REJECTED: [],
+    };
+    const byRequest = new Map();
+    for (const h of allHistories) {
+        if (!byRequest.has(h.requestId))
+            byRequest.set(h.requestId, []);
+        byRequest.get(h.requestId).push(h);
+    }
+    for (const [reqId, histories] of byRequest.entries()) {
+        histories.sort((a, b) => new Date(a.enteredAt).getTime() - new Date(b.enteredAt).getTime());
+        let prevStage = null;
+        for (const h of histories) {
+            const enteredAt = new Date(h.enteredAt);
+            const normalizedCurrent = normalizeStage(h.stage);
+            if (enteredAt < start) {
+                prevStage = normalizedCurrent;
+                continue;
+            }
+            const from = normalizeStage(prevStage);
+            const to = normalizedCurrent;
+            const info = recentHistories.find((x) => x.id === h.id)?.request;
+            const record = {
+                requestId: reqId,
+                title: info?.title || '',
+                customerName: info?.customerName || '',
+                productArea: info?.productArea || '',
+                currentStage: info?.currentStage || to,
+                fromStage: from,
+                toStage: to,
+                enteredAt,
+            };
+            if (from === 'IDEATION' && to === 'REVIEW')
+                buckets.IDEATION_TO_REVIEW.push(record);
+            if (from === 'REVIEW' && to === 'CONFIRM')
+                buckets.REVIEW_TO_CONFIRM.push(record);
+            if (from === 'CONFIRM' && to === 'PROJECT')
+                buckets.CONFIRM_TO_PROJECT.push(record);
+            if (from === 'PROJECT' && to === 'RELEASE')
+                buckets.PROJECT_TO_RELEASE.push(record);
+            if (to === 'REJECTED')
+                buckets.ANY_TO_REJECTED.push(record);
+            prevStage = to;
+        }
+    }
+    // keep only the latest transition per request for each bucket
+    const keepLatest = (items) => {
+        const byReq = new Map();
+        for (const item of items) {
+            const ts = new Date(item.enteredAt).getTime();
+            const existing = byReq.get(item.requestId);
+            if (!existing || ts > new Date(existing.enteredAt).getTime()) {
+                byReq.set(item.requestId, item);
+            }
+        }
+        return Array.from(byReq.values()).sort((a, b) => new Date(b.enteredAt).getTime() - new Date(a.enteredAt).getTime());
+    };
+    const transitions = [
+        { key: 'IDEATION_TO_REVIEW', label: 'Ideation \u2192 Review', items: keepLatest(buckets.IDEATION_TO_REVIEW) },
+        { key: 'REVIEW_TO_CONFIRM', label: 'Review \u2192 Confirm', items: keepLatest(buckets.REVIEW_TO_CONFIRM) },
+        { key: 'CONFIRM_TO_PROJECT', label: 'Confirm \u2192 Project', items: keepLatest(buckets.CONFIRM_TO_PROJECT) },
+        { key: 'PROJECT_TO_RELEASE', label: 'Project \u2192 Complete', items: keepLatest(buckets.PROJECT_TO_RELEASE) },
+        { key: 'ANY_TO_REJECTED', label: 'Rejected (any stage)', items: keepLatest(buckets.ANY_TO_REJECTED) },
+    ];
+    res.json({ windowDays, transitions });
+});
 // RD groups list (for frontend to render checkboxes with IDs)
 router.get('/rd-groups', async (_req, res) => {
     const groups = await db_1.prisma.rDGroup.findMany({ orderBy: { name: 'asc' } });
@@ -305,8 +406,15 @@ router.patch('/:id', auth_1.authMiddleware, (0, auth_1.requireRole)(['ADMIN', 'E
     const allowedKeys = [
         'title', 'customerName', 'productArea', 'productModel', 'category', 'expectedRevenue', 'importanceFlag',
         'customerDeadline', 'currentStage', 'currentStatus', 'region', 'rawCustomerText', 'salesSummary',
-        'revenueEstimateStatus', 'revenueEstimateNote'
+        'revenueEstimateStatus', 'revenueEstimateNote', 'createdByDept', 'createdByName'
     ];
+    const keywords = Array.isArray(body.keywords) ? body.keywords : undefined;
+    const techAreas = Array.isArray(body.techAreas) ? body.techAreas : undefined;
+    const attachments = Array.isArray(body.attachments)
+        ? body.attachments
+        : undefined;
+    const technicalNotesProvided = Object.prototype.hasOwnProperty.call(body, 'technicalNotes');
+    const technicalNotes = typeof body.technicalNotes === 'string' ? body.technicalNotes : null;
     for (const k of allowedKeys) {
         if (body[k] !== undefined && body[k] !== null) {
             if (k === 'customerDeadline')
@@ -317,17 +425,125 @@ router.patch('/:id', auth_1.authMiddleware, (0, auth_1.requireRole)(['ADMIN', 'E
                 data[k] = body[k];
         }
     }
+    // Keep createdByUserId stable to avoid breaking the relation; only update display name
+    if (typeof body.createdByName === 'string') {
+        const name = body.createdByName.trim();
+        data.createdByName = name.length ? name : existing.createdByName;
+    }
+    const newRdGroups = Array.isArray(body.rdGroupIds) ? body.rdGroupIds : undefined;
     const stageChanged = body.currentStage && body.currentStage !== existing.currentStage;
-    if (Object.keys(data).length > 0) {
-        await db_1.prisma.request.update({ where: { id }, data });
-    }
-    if (stageChanged) {
-        const now = new Date();
-        await db_1.prisma.stageHistory.updateMany({ where: { requestId: id, exitedAt: null }, data: { exitedAt: now } });
-        await db_1.prisma.stageHistory.create({ data: { requestId: id, stage: body.currentStage, enteredAt: now, exitedAt: null } });
-    }
+    await db_1.prisma.$transaction(async (tx) => {
+        if (Object.keys(data).length > 0) {
+            await tx.request.update({ where: { id }, data });
+        }
+        if (stageChanged) {
+            const now = new Date();
+            await tx.stageHistory.updateMany({ where: { requestId: id, exitedAt: null }, data: { exitedAt: now } });
+            await tx.stageHistory.create({ data: { requestId: id, stage: body.currentStage, enteredAt: now, exitedAt: null } });
+        }
+        if (keywords) {
+            await tx.requestKeyword.deleteMany({ where: { requestId: id } });
+            if (keywords.length) {
+                await tx.requestKeyword.createMany({
+                    data: keywords.filter(Boolean).map((k) => ({ requestId: id, keyword: k })),
+                });
+            }
+        }
+        if (attachments) {
+            await tx.requestAttachment.deleteMany({ where: { requestId: id } });
+            if (attachments.length) {
+                await tx.requestAttachment.createMany({
+                    data: attachments.map((a) => ({
+                        requestId: id,
+                        filename: a.filename,
+                        url: a.url ?? null,
+                    })),
+                });
+            }
+        }
+        if (techAreas || technicalNotesProvided) {
+            await tx.requestTechArea.deleteMany({ where: { requestId: id } });
+            const techAreasCreate = [...(techAreas ?? [])];
+            const note = technicalNotes?.trim();
+            if (note) {
+                techAreasCreate.push({ groupName: 'Notes', code: 'NOTE', label: note });
+            }
+            if (techAreasCreate.length) {
+                await tx.requestTechArea.createMany({
+                    data: techAreasCreate.map((t) => ({
+                        requestId: id,
+                        groupName: t.groupName ?? 'Notes',
+                        code: t.code ?? 'NOTE',
+                        label: t.label ?? '',
+                    })),
+                });
+            }
+        }
+        if (newRdGroups) {
+            await tx.requestRDGroup.deleteMany({ where: { requestId: id } });
+            if (newRdGroups.length) {
+                await tx.requestRDGroup.createMany({
+                    data: newRdGroups.map((g) => ({ requestId: id, rdGroupId: g, role: 'LEAD' })),
+                });
+            }
+        }
+    });
     const updated = await db_1.prisma.request.findUnique({ where: { id }, include: detailInclude });
-    res.json(updated ? { ...updated, expectedRevenue: toNumber(updated.expectedRevenue) } : updated);
+    res.json(updated
+        ? {
+            ...updated,
+            expectedRevenue: toNumber(updated.expectedRevenue),
+            technicalNotes: updated.techAreas?.find((t) => t.code === 'NOTE')?.label ?? null,
+            customerInfluenceScore: (() => {
+                const raw = updated.techAreas?.find((t) => t.code === 'INF_SCORE')?.label;
+                const num = raw ? Number(raw) : null;
+                return Number.isFinite(num) ? num : null;
+            })(),
+        }
+        : updated);
+});
+// Set/update target completion date for a stage (RD/EXEC/ADMIN)
+router.patch('/:id/stage-target', auth_1.authMiddleware, (0, auth_1.requireRole)(['ADMIN', 'EXEC', 'RD']), async (req, res) => {
+    const { id } = req.params;
+    const { stage, targetDate } = req.body || {};
+    if (!stage || !targetDate)
+        return res.status(400).json({ error: 'stage and targetDate required' });
+    const parsed = new Date(targetDate);
+    if (Number.isNaN(parsed.getTime()))
+        return res.status(400).json({ error: 'Invalid targetDate' });
+    const request = await db_1.prisma.request.findUnique({ where: { id } });
+    if (!request)
+        return res.status(404).json({ error: 'Not found' });
+    const authUser = req.user || {};
+    const setByUserId = authUser.user_id ?? null;
+    const setByName = authUser.name ?? null;
+    const normalizedStage = stage === 'COMPLETE' ? 'RELEASE' : stage;
+    const existing = await db_1.prisma.requestStageTarget.findUnique({
+        where: { requestId_stage: { requestId: id, stage: normalizedStage } },
+    });
+    await db_1.prisma.$transaction(async (tx) => {
+        await tx.requestStageTarget.upsert({
+            where: { requestId_stage: { requestId: id, stage: normalizedStage } },
+            update: { targetDate: parsed, setByUserId, setByName },
+            create: { requestId: id, stage: normalizedStage, targetDate: parsed, setByUserId, setByName },
+        });
+        await tx.requestStageTargetHistory.create({
+            data: {
+                requestId: id,
+                stage: normalizedStage,
+                previousTarget: existing?.targetDate ?? null,
+                newTarget: parsed,
+                changedByUserId: setByUserId,
+                changedByName: setByName,
+            },
+        });
+    });
+    const targets = await db_1.prisma.requestStageTarget.findMany({ where: { requestId: id } });
+    const history = await db_1.prisma.requestStageTargetHistory.findMany({
+        where: { requestId: id },
+        orderBy: { changedAt: 'desc' },
+    });
+    res.json({ target: targets.find((t) => t.stage === normalizedStage), targets, history });
 });
 // Delete request (admin tool)
 router.delete('/:id', auth_1.authMiddleware, (0, auth_1.requireRole)(['admin']), async (req, res) => {
