@@ -441,7 +441,7 @@ export default function RequestDetail({
                     checked={checked}
                     onChange={(e) => {
                       const prev = (draft?.rdGroupIds ?? item.rdGroups.map((x) => x.rdGroup.id));
-                      const next = e.target.checked ? [...new Set([...prev, g.id])] : prev.filter((id) => id !== g.id);
+                      const next = e.target.checked ? [...new Set([...prev, g.id])] : prev.filter((id: string) => id !== g.id);
                       setDraft({ ...draft, rdGroupIds: next });
                     }}
                     style={{ marginRight: 6 }}

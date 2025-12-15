@@ -8,6 +8,7 @@ import RequestList from './pages/RequestList';
 import RequestDetail from './pages/RequestDetail';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
+import AdminUsers from './pages/AdminUsers';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import { getAuthToken, decodeToken, clearAuth } from './auth';
@@ -49,6 +50,7 @@ function RoleAwareLayout({ role }: { role: 'viewer' | 'executive' | string }) {
           {!onlyList && token && <Link className={isActive('/') ? 'active' : ''} to="/">{t('nav_dashboard')}</Link>}
           {token && <Link className={isActive('/list') ? 'active' : ''} to="/list">{t('nav_list')}</Link>}
           {!onlyList && token && userRole !== 'external_viewer' && <Link className={isActive('/request') ? 'active' : ''} to="/request">{t('nav_new')}</Link>}
+          {roleUpper === 'ADMIN' && token && <Link className={isActive('/admin') ? 'active' : ''} to="/admin">Admin</Link>}
         </nav>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           {token ? (
@@ -76,6 +78,7 @@ function RoleAwareLayout({ role }: { role: 'viewer' | 'executive' | string }) {
         {token && <Route path="/list/:id" element={<RequestDetail readOnly={onlyList} />} />}
         {token && <Route path="/request/:id" element={<RequestDetail readOnly={onlyList} />} />}
         {token && !onlyList && userRole !== 'external_viewer' && <Route path="/request" element={<RequestForm />} />}
+        {token && roleUpper === 'ADMIN' && <Route path="/admin" element={<AdminUsers />} />}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
