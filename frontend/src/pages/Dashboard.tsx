@@ -87,6 +87,9 @@ export default function Dashboard() {
     try {
       const data = await fetchJSON<{ columns: Array<{ stage: string; items: any[] }>; overdue: any[] }>(`/requests/stage-targets`);
       setStageTargets(data);
+    } catch (e) {
+      // fallback will be filled by useEffect on requests
+      setStageTargets(buildStageTargetsFallback());
     } finally {
       setStageTargetsLoading(false);
     }
@@ -130,8 +133,13 @@ export default function Dashboard() {
   useEffect(() => {
     if (!stageTargets) {
       setStageTargets(buildStageTargetsFallback());
+      return;
     }
-  }, [requests]);
+    const totalItems = stageTargets.columns?.reduce((sum, c) => sum + (c.items?.length || 0), 0) || 0;
+    if (totalItems === 0 && requests.length > 0) {
+      setStageTargets(buildStageTargetsFallback());
+    }
+  }, [requests, stageTargets]);
 
   const kpis = useMemo(() => {
     const now = new Date();
