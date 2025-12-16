@@ -649,7 +649,7 @@ router.patch('/:id/stage-target', authMiddleware, requireRole(['ADMIN', 'EXEC', 
 });
 
 // Stage target board data
-router.get('/stage-targets', async (_req, res) => {
+router.get('/stage-targets', authMiddleware, requireRole(['ADMIN', 'EXEC', 'RD', 'SALES', 'VIEWER']), async (_req, res) => {
   const stageOrder = ['IDEATION', 'REVIEW', 'CONFIRM', 'PROJECT', 'RELEASE'] as const;
   const items = await prisma.request.findMany({
     where: { currentStage: { in: stageOrder as any } },
@@ -688,6 +688,19 @@ router.get('/stage-targets', async (_req, res) => {
       overdue.push(entry);
     }
   }
+
+  columns.forEach((c) =>
+    c.items.sort((a, b) => {
+      const ta = a.targetDate ? new Date(a.targetDate).getTime() : Infinity;
+      const tb = b.targetDate ? new Date(b.targetDate).getTime() : Infinity;
+      return ta - tb;
+    })
+  );
+  overdue.sort((a, b) => {
+    const ta = a.targetDate ? new Date(a.targetDate).getTime() : Infinity;
+    const tb = b.targetDate ? new Date(b.targetDate).getTime() : Infinity;
+    return ta - tb;
+  });
 
   res.json({ columns, overdue });
 });

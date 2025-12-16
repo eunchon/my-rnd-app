@@ -295,7 +295,9 @@ export default function Dashboard() {
         >
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
             {(['IDEATION', 'REVIEW', 'CONFIRM', 'PROJECT', 'RELEASE'] as const).map((stageCode) => {
-              const col = stageTargets?.columns?.find((c) => c.stage === stageCode) || { items: [] };
+              const col = stageTargets?.columns
+                ?.find((c) => c.stage === stageCode)
+                || { items: [] };
               return (
                 <div
                   key={stageCode}
