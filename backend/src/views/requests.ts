@@ -663,7 +663,6 @@ router.get('/stage-targets', authMiddleware, requireRole(['ADMIN', 'EXEC', 'RD',
   const overdue: any[] = [];
 
   for (const r of items) {
-    const target = r.stageTargets.find((t) => t.stage === r.currentStage) || null;
     const history = r.stageTargetHistory
       .filter((h) => h.stage === r.currentStage)
       .slice(0, 5)
@@ -673,12 +672,14 @@ router.get('/stage-targets', authMiddleware, requireRole(['ADMIN', 'EXEC', 'RD',
         changedAt: h.changedAt,
         changedByName: h.changedByName,
       }));
+    const target = r.stageTargets.find((t) => t.stage === r.currentStage) || null;
+    const targetDate = target?.targetDate ?? history[0]?.newTarget ?? null;
 
     const entry = {
       id: r.id,
       title: r.title,
       stage: r.currentStage,
-      targetDate: target?.targetDate ?? null,
+      targetDate,
       history,
       expectedRevenue: toNumber(r.expectedRevenue),
     };
