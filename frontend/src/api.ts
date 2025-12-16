@@ -19,6 +19,21 @@ function authHeaders(): Record<string, string> {
   return headers;
 }
 
+function readCsrfToken(): string | null {
+  if (typeof document === 'undefined') return null;
+  // prefer meta tag (e.g., Rails style) then cookie (e.g., XSRF-TOKEN)
+  const meta = document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null;
+  if (meta?.content) return meta.content;
+  const match = document.cookie.match(/(?:^|; )XSRF-TOKEN=([^;]*)/);
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+function withSecurityHeaders(headers: Record<string, string>): Record<string, string> {
+  const csrf = readCsrfToken();
+  if (csrf) headers['X-CSRF-Token'] = csrf;
+  return headers;
+}
+
 async function handleJSON<T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> {
   const res = await fetch(input, init);
   const text = await res.text();
@@ -42,14 +57,16 @@ async function handleJSON<T>(input: RequestInfo | URL, init?: RequestInit): Prom
 
 export function fetchJSON<T>(path: string): Promise<T> {
   return handleJSON<T>(fullUrl(path), {
-    headers: { ...authHeaders() },
+    credentials: 'include',
+    headers: withSecurityHeaders({ ...authHeaders() }),
   });
 }
 
 export function postJSON<T>(path: string, body: any): Promise<T> {
   return handleJSON<T>(fullUrl(path), {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    credentials: 'include',
+    headers: withSecurityHeaders({ 'Content-Type': 'application/json', ...authHeaders() }),
     body: JSON.stringify(body),
   });
 }
@@ -57,7 +74,8 @@ export function postJSON<T>(path: string, body: any): Promise<T> {
 export function patchJSON<T>(path: string, body: any): Promise<T> {
   return handleJSON<T>(fullUrl(path), {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    credentials: 'include',
+    headers: withSecurityHeaders({ 'Content-Type': 'application/json', ...authHeaders() }),
     body: JSON.stringify(body),
   });
 }
@@ -65,6 +83,7 @@ export function patchJSON<T>(path: string, body: any): Promise<T> {
 export function deleteJSON<T>(path: string): Promise<T> {
   return handleJSON<T>(fullUrl(path), {
     method: 'DELETE',
-    headers: { ...authHeaders() },
+    credentials: 'include',
+    headers: withSecurityHeaders({ ...authHeaders() }),
   });
 }

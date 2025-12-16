@@ -9,6 +9,27 @@ const productModels: Record<string, string[]> = {
   DENTAL: ['Papaya Plus', 'GT300', 'Papaya 3D Premium Plus', 'Papaya 3D Premium ENT', 'Papaya 3D Plus', 'DVAS', 'Port-X 4'],
 };
 
+const allowedLinkHosts = ['genoray.com', 'drive.google.com', 'docs.google.com', 'sharepoint.com'];
+
+function normalizeDigits(val: string, maxLen?: number) {
+  const digits = (val || '').replace(/[^0-9]/g, '');
+  return typeof maxLen === 'number' ? digits.slice(0, maxLen) : digits;
+}
+
+function clampText(val: string, maxLen: number) {
+  return (val || '').slice(0, maxLen);
+}
+
+function isAllowedLink(val: string) {
+  try {
+    const url = new URL(val);
+    if (!['http:', 'https:'].includes(url.protocol)) return false;
+    return allowedLinkHosts.some((host) => url.hostname === host || url.hostname.endsWith(`.${host}`));
+  } catch {
+    return false;
+  }
+}
+
 const schema = z.object({
   title: z.string().min(1),
   customerName: z.string().min(1),
@@ -161,6 +182,15 @@ export default function RequestForm() {
     return Math.min(10, total);
   }, [form]);
 
+  const referenceLinksList = useMemo(
+    () => (form.referenceLinks || '').split(/\s+/).map((s) => s.trim()).filter(Boolean),
+    [form.referenceLinks]
+  );
+  const invalidReferenceLinks = useMemo(
+    () => referenceLinksList.filter((link) => !isAllowedLink(link)),
+    [referenceLinksList]
+  );
+
   const canSubmit = useMemo(() => {
     const parsed = schema.safeParse({
       ...form,
@@ -183,8 +213,9 @@ export default function RequestForm() {
     if (!isNewProduct && (!form.productArea || (!form.productModel && applicableModels.length))) return false;
     if (!form.authorName && !form.createdByUserId) return false;
     if (!form.createdByDept) return false;
+    if (invalidReferenceLinks.length) return false;
     return true;
-  }, [form, isNewProduct, applicableModels.length]);
+  }, [form, isNewProduct, applicableModels.length, invalidReferenceLinks.length]);
 
   async function submit() {
     setError(null);
@@ -194,6 +225,18 @@ export default function RequestForm() {
         !form.expectedRevenueUnknown && form.expectedRevenue && !Number.isNaN(Number(form.expectedRevenue))
           ? Number(form.expectedRevenue)
           : null;
+
+      const safeReferenceLinks = referenceLinksList.filter(isAllowedLink);
+
+      const payload = {
+        ...form,
+        title: form.title.trim(),
+        customerName: form.customerName.trim(),
+        rawCustomerText: form.rawCustomerText.trim(),
+        salesSummary: form.salesSummary.trim(),
+        risks: form.risks.trim(),
+        referenceLinks: safeReferenceLinks.join(' '),
+      };
 
       const technicalNotesParts: string[] = [];
       const pushNote = (label: string, val: any) => {
@@ -220,7 +263,7 @@ export default function RequestForm() {
       const technicalNotes = technicalNotesParts.join('\n');
 
       await postJSON('/requests', {
-        ...form,
+        ...payload,
         createdByUserId: form.authorName || form.createdByUserId || 'unknown',
         influenceRevenue: Number(form.influenceRevenue || 0),
         influenceKol: Number(form.influenceKol || 0),
@@ -309,12 +352,17 @@ export default function RequestForm() {
         <SectionHeader badge="A" color="#1d4ed8" bg="#e0e7ff" title={t('form_header_basic')} />
         <div className="grid grid-2" style={{ gap: 12 }}>
           <Field label={t('form_request_title')}>
-            <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+            <input
+              value={form.title}
+              onChange={(e) => setForm({ ...form, title: clampText(e.target.value, 200) })}
+              maxLength={200}
+            />
           </Field>
           <Field label={t('form_author')}>
             <input
               value={form.authorName}
-              onChange={(e) => setForm({ ...form, authorName: e.target.value })}
+              onChange={(e) => setForm({ ...form, authorName: clampText(e.target.value, 120) })}
+              maxLength={120}
               placeholder={t('form_author_placeholder')}
             />
           </Field>
@@ -338,7 +386,11 @@ export default function RequestForm() {
             </select>
           </Field>
           <Field label={t('form_customer_name')}>
-            <input value={form.customerName} onChange={(e) => setForm({ ...form, customerName: e.target.value })} />
+            <input
+              value={form.customerName}
+              onChange={(e) => setForm({ ...form, customerName: clampText(e.target.value, 200) })}
+              maxLength={200}
+            />
           </Field>
           <Field label={t('form_region')}>
             <select value={form.region} onChange={(e) => setForm({ ...form, region: e.target.value })}>
@@ -363,7 +415,11 @@ export default function RequestForm() {
       <div className="card raw-block">
         <SectionHeader badge="B" color="#1d4ed8" bg="#dbeafe" title={t('form_customer_raw')} />
         <Field label={t('form_customer_raw_text')}>
-          <textarea value={form.rawCustomerText} onChange={(e) => setForm({ ...form, rawCustomerText: e.target.value })} />
+          <textarea
+            value={form.rawCustomerText}
+            onChange={(e) => setForm({ ...form, rawCustomerText: clampText(e.target.value, 4000) })}
+            maxLength={4000}
+          />
         </Field>
         <div className="muted">{t('form_attachments_note')}</div>
       </div>
@@ -574,8 +630,7 @@ export default function RequestForm() {
                 pattern="[0-9]*"
                 value={form.expectedRevenue}
                 onChange={(e) => {
-                  const digits = e.target.value.replace(/[^0-9]/g, '');
-                  setForm((prev: any) => ({ ...prev, expectedRevenue: digits }));
+                  setForm((prev: any) => ({ ...prev, expectedRevenue: normalizeDigits(e.target.value, 12) }));
                 }}
                 disabled={form.expectedRevenueUnknown}
                 placeholder={t('form_comma_sep') || 'Digits only e.g., 300000000'}
@@ -698,21 +753,31 @@ export default function RequestForm() {
       <div className="card">
         <SectionHeader badge="F" color="#111827" bg="#e5e7eb" title={t('form_detail_duplicate')} />
         <Field label={t('form_sales_summary')}>
-          <textarea value={form.salesSummary} onChange={(e) => setForm({ ...form, salesSummary: e.target.value })} />
+          <textarea
+            value={form.salesSummary}
+            onChange={(e) => setForm({ ...form, salesSummary: clampText(e.target.value, 4000) })}
+            maxLength={4000}
+          />
         </Field>
         <Field label="Risks / concerns">
           <textarea
             value={form.risks}
-            onChange={(e) => setForm({ ...form, risks: e.target.value })}
+            onChange={(e) => setForm({ ...form, risks: clampText(e.target.value, 2000) })}
+            maxLength={2000}
             placeholder="e.g., mechanical change needs certification"
           />
         </Field>
         <Field label="Reference links">
           <input
             value={form.referenceLinks}
-            onChange={(e) => setForm({ ...form, referenceLinks: e.target.value })}
+            onChange={(e) => setForm({ ...form, referenceLinks: clampText(e.target.value, 1000) })}
             placeholder="e.g., drive link or public URL"
           />
+          {invalidReferenceLinks.length > 0 && (
+            <div style={{ color: '#b91c1c', fontSize: 12, marginTop: 4 }}>
+              Only approved links allowed: {allowedLinkHosts.join(', ')}
+            </div>
+          )}
         </Field>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <button type="button" onClick={doSimilarSearch}>
