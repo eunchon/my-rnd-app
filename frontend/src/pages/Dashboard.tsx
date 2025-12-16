@@ -106,7 +106,7 @@ export default function Dashboard() {
           id: r.id,
           title: r.title,
           stage: r.currentStage,
-          targetDate: r.customerDeadline || null,
+          targetDate: null,
           history: [],
         })),
     }));
@@ -116,7 +116,7 @@ export default function Dashboard() {
         id: r.id,
         title: r.title,
         stage: r.currentStage,
-        targetDate: r.customerDeadline || null,
+        targetDate: null,
       }));
     return { columns, overdue };
   };
@@ -394,7 +394,7 @@ export default function Dashboard() {
                       >
                         <div style={{ fontWeight: 800, color: '#0f172a' }}>{it.title}</div>
                         <div style={{ fontSize: 13, color: '#475569', marginTop: 4 }}>
-                          예상 완료일: {formatDate(it.targetDate)}
+                          목표 완료일: {formatDate(it.targetDate)}
                         </div>
                         {it.history?.length > 0 && (
                           <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -421,7 +421,7 @@ export default function Dashboard() {
           </div>
           {stageTargets?.overdue?.length ? (
             <div style={{ marginTop: 16 }}>
-              <div style={{ fontWeight: 800, color: '#b91c1c', marginBottom: 8 }}>예상 완료일 초과</div>
+              <div style={{ fontWeight: 800, color: '#b91c1c', marginBottom: 8 }}>목표 완료일 초과</div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 {stageTargets.overdue.map((it: any) => (
                   <div
@@ -437,7 +437,7 @@ export default function Dashboard() {
                     }}
                   >
                     <div style={{ fontWeight: 800, color: '#be123c' }}>{it.title}</div>
-                    <div style={{ fontSize: 13, color: '#be123c' }}>예상 완료일: {formatDate(it.targetDate)}</div>
+                    <div style={{ fontSize: 13, color: '#be123c' }}>목표 완료일: {formatDate(it.targetDate)}</div>
                     <div style={{ fontSize: 12, color: '#be123c' }}>단계: {stageLabel(it.stage)}</div>
                   </div>
                 ))}
