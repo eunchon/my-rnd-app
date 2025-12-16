@@ -30,6 +30,8 @@ export default function Dashboard() {
   const [scored, setScored] = useState<any[]>([]);
   const [modal, setModal] = useState<{ title: string; items: any[] } | null>(null);
   const [updatesModal, setUpdatesModal] = useState<{ title: string; items: any[] } | null>(null);
+  const [stageTargets, setStageTargets] = useState<{ columns: Array<{ stage: string; items: any[] }>; overdue: any[] } | null>(null);
+  const [stageTargetsLoading, setStageTargetsLoading] = useState(false);
   const [urgentOnly, setUrgentOnly] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     const v = localStorage.getItem('dash_urgentOnly');
@@ -80,9 +82,20 @@ export default function Dashboard() {
     setTransitionStats(data);
   }
 
+  async function loadStageTargets() {
+    setStageTargetsLoading(true);
+    try {
+      const data = await fetchJSON<{ columns: Array<{ stage: string; items: any[] }>; overdue: any[] }>(`/requests/stage-targets`);
+      setStageTargets(data);
+    } finally {
+      setStageTargetsLoading(false);
+    }
+  }
+
   useEffect(() => { loadData(); }, []);
   useEffect(() => { loadData(); }, [productArea, stage, fromDate, toDate]);
   useEffect(() => { loadTransitions(transitionWindow); }, [transitionWindow]);
+  useEffect(() => { loadStageTargets(); }, []);
 
   const kpis = useMemo(() => {
     const now = new Date();
@@ -109,6 +122,13 @@ export default function Dashboard() {
     };
     return map[code] || code;
   }
+
+  const formatDate = (val?: string | Date | null) => {
+    if (!val) return '-';
+    const d = new Date(val);
+    if (Number.isNaN(d.getTime())) return '-';
+    return d.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' });
+  };
 
   useEffect(() => {
     const now = Date.now();
@@ -255,6 +275,125 @@ export default function Dashboard() {
             {formatKRW(completedRevenue)}
           </div>
           <div className="muted">완료된 R&D의 연간 예상 매출</div>
+        </div>
+      </div>
+
+      <div className="card" style={{ marginTop: 8 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+          <div className="section-title">R&D 진행 현황 (목표일)</div>
+          <button type="button" onClick={loadStageTargets} disabled={stageTargetsLoading}>
+            {stageTargetsLoading ? 'Loading...' : '새로고침'}
+          </button>
+        </div>
+        <div
+          style={{
+            border: '1px solid #e2e8f0',
+            borderRadius: 18,
+            padding: 12,
+            background: 'linear-gradient(135deg, #f8fafc 0%, #ffffff 60%)',
+          }}
+        >
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+            {(['IDEATION', 'REVIEW', 'CONFIRM', 'PROJECT', 'RELEASE'] as const).map((stageCode) => {
+              const col = stageTargets?.columns?.find((c) => c.stage === stageCode) || { items: [] };
+              return (
+                <div
+                  key={stageCode}
+                  style={{
+                    border: '1px solid #cbd5e1',
+                    borderRadius: 14,
+                    padding: 10,
+                    background: '#fff',
+                    minHeight: 160,
+                    boxShadow: 'inset 0 0 0 1px rgba(226,232,240,0.3)',
+                  }}
+                >
+                  <div
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      padding: '6px 10px',
+                      borderRadius: 999,
+                      background: '#e2e8f0',
+                      fontWeight: 700,
+                      fontSize: 13,
+                      color: '#0f172a',
+                      marginBottom: 10,
+                    }}
+                  >
+                    {stageLabel(stageCode)}
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {!col.items.length && (
+                      <div style={{ color: '#94a3b8', fontSize: 13 }}>프로젝트 없음</div>
+                    )}
+                    {col.items.map((it) => (
+                      <div
+                        key={it.id}
+                        onClick={() => navigate(`/request/${it.id}`)}
+                        style={{
+                          padding: '10px 12px',
+                          borderRadius: 12,
+                          border: '1px solid #e5e7eb',
+                          background: '#f8fafc',
+                          cursor: 'pointer',
+                          boxShadow: '0 6px 16px rgba(15,23,42,0.05)',
+                        }}
+                      >
+                        <div style={{ fontWeight: 800, color: '#0f172a' }}>{it.title}</div>
+                        <div style={{ fontSize: 13, color: '#475569', marginTop: 4 }}>
+                          예상 완료일: {formatDate(it.targetDate)}
+                        </div>
+                        {it.history?.length > 0 && (
+                          <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                            {it.history.slice(0, 3).map((h: any, idx: number) => (
+                              <div key={idx} style={{ fontSize: 12, color: '#94a3b8' }}>
+                                <span style={{ textDecoration: 'line-through', marginRight: 6 }}>
+                                  {formatDate(h.previousTarget)}
+                                </span>
+                                → <span style={{ marginLeft: 6 }}>{formatDate(h.newTarget)}</span>
+                                <span style={{ marginLeft: 6, color: '#cbd5e1' }}>
+                                  {new Date(h.changedAt).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}
+                                  {h.changedByName ? ` • ${h.changedByName}` : ''}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {stageTargets?.overdue?.length ? (
+            <div style={{ marginTop: 16 }}>
+              <div style={{ fontWeight: 800, color: '#b91c1c', marginBottom: 8 }}>예상 완료일 초과</div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {stageTargets.overdue.map((it: any) => (
+                  <div
+                    key={it.id}
+                    onClick={() => navigate(`/request/${it.id}`)}
+                    style={{
+                      padding: '10px 12px',
+                      borderRadius: 12,
+                      border: '1px solid #fecdd3',
+                      background: '#fff1f2',
+                      cursor: 'pointer',
+                      minWidth: 200,
+                    }}
+                  >
+                    <div style={{ fontWeight: 800, color: '#be123c' }}>{it.title}</div>
+                    <div style={{ fontSize: 13, color: '#be123c' }}>예상 완료일: {formatDate(it.targetDate)}</div>
+                    <div style={{ fontSize: 12, color: '#be123c' }}>단계: {stageLabel(it.stage)}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div style={{ marginTop: 12, fontSize: 12, color: '#94a3b8' }}>초과된 프로젝트가 없습니다.</div>
+          )}
         </div>
       </div>
 

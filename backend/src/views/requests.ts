@@ -648,6 +648,50 @@ router.patch('/:id/stage-target', authMiddleware, requireRole(['ADMIN', 'EXEC', 
   res.json({ target: targets.find((t) => t.stage === normalizedStage), targets, history });
 });
 
+// Stage target board data
+router.get('/stage-targets', async (_req, res) => {
+  const stageOrder = ['IDEATION', 'REVIEW', 'CONFIRM', 'PROJECT', 'RELEASE'] as const;
+  const items = await prisma.request.findMany({
+    where: { currentStage: { in: stageOrder as any } },
+    include: {
+      stageTargets: true,
+      stageTargetHistory: { orderBy: { changedAt: 'desc' } },
+    },
+  });
+  const now = Date.now();
+  const columns = stageOrder.map((stage) => ({ stage, items: [] as any[] }));
+  const overdue: any[] = [];
+
+  for (const r of items) {
+    const target = r.stageTargets.find((t) => t.stage === r.currentStage) || null;
+    const history = r.stageTargetHistory
+      .filter((h) => h.stage === r.currentStage)
+      .slice(0, 5)
+      .map((h) => ({
+        previousTarget: h.previousTarget,
+        newTarget: h.newTarget,
+        changedAt: h.changedAt,
+        changedByName: h.changedByName,
+      }));
+
+    const entry = {
+      id: r.id,
+      title: r.title,
+      stage: r.currentStage,
+      targetDate: target?.targetDate ?? null,
+      history,
+      expectedRevenue: toNumber(r.expectedRevenue),
+    };
+    const col = columns.find((c) => c.stage === r.currentStage);
+    if (col) col.items.push(entry);
+    if (entry.targetDate && new Date(entry.targetDate).getTime() < now && r.currentStage !== 'RELEASE') {
+      overdue.push(entry);
+    }
+  }
+
+  res.json({ columns, overdue });
+});
+
 // Delete request (admin tool)
 router.delete('/:id', authMiddleware, requireRole(['admin']), async (req, res) => {
   const { id } = req.params;
