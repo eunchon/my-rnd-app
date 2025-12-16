@@ -92,10 +92,46 @@ export default function Dashboard() {
     }
   }
 
+  const stageOrder = ['IDEATION', 'REVIEW', 'CONFIRM', 'PROJECT', 'RELEASE'] as const;
+  const buildStageTargetsFallback = () => {
+    const now = Date.now();
+    const columns = stageOrder.map((stage) => ({
+      stage,
+      items: requests
+        .filter((r) => r.currentStage === stage)
+        .map((r) => ({
+          id: r.id,
+          title: r.title,
+          stage: r.currentStage,
+          targetDate: r.customerDeadline || null,
+          history: [],
+        })),
+    }));
+    const overdue = requests
+      .filter((r) => r.currentStage !== 'RELEASE' && new Date(r.customerDeadline).getTime() < now)
+      .map((r) => ({
+        id: r.id,
+        title: r.title,
+        stage: r.currentStage,
+        targetDate: r.customerDeadline || null,
+      }));
+    return { columns, overdue };
+  };
+
   useEffect(() => { loadData(); }, []);
   useEffect(() => { loadData(); }, [productArea, stage, fromDate, toDate]);
   useEffect(() => { loadTransitions(transitionWindow); }, [transitionWindow]);
-  useEffect(() => { loadStageTargets(); }, []);
+  useEffect(() => {
+    loadStageTargets().catch(() => {
+      // ignore; fallback handled separately
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!stageTargets) {
+      setStageTargets(buildStageTargetsFallback());
+    }
+  }, [requests]);
 
   const kpis = useMemo(() => {
     const now = new Date();
@@ -281,7 +317,13 @@ export default function Dashboard() {
       <div className="card" style={{ marginTop: 8 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 12 }}>
           <div className="section-title">R&D 진행 현황 (목표일)</div>
-          <button type="button" onClick={loadStageTargets} disabled={stageTargetsLoading}>
+          <button
+            type="button"
+            onClick={() => {
+              loadStageTargets().catch(() => setStageTargets(buildStageTargetsFallback()));
+            }}
+            disabled={stageTargetsLoading}
+          >
             {stageTargetsLoading ? 'Loading...' : '새로고침'}
           </button>
         </div>
