@@ -64,16 +64,16 @@ const CSRF_COOKIE = 'XSRF-TOKEN';
 const isProd = process.env.NODE_ENV === 'production';
 function ensureCsrfToken(req: Request, res: Response, next: any) {
   const cookies = (req as any).cookies || {};
-  const token = cookies[CSRF_COOKIE];
-  if (!token) {
-    const newToken = crypto.randomBytes(16).toString('hex');
-    res.cookie(CSRF_COOKIE, newToken, {
-      httpOnly: false, // double-submit cookie pattern
-      sameSite: 'lax',
-      secure: isProd,
-      path: '/',
-    });
-  }
+  let token = cookies[CSRF_COOKIE];
+  if (!token) token = crypto.randomBytes(16).toString('hex');
+  // Always refresh cookie to ensure client has latest token with correct flags
+  res.cookie(CSRF_COOKIE, token, {
+    httpOnly: false, // double-submit cookie pattern
+    sameSite: 'none', // allow cross-site frontend/API usage
+    secure: isProd,
+    path: '/',
+  });
+  res.setHeader('X-CSRF-Token', token);
   next();
 }
 function verifyCsrf(req: Request, res: Response, next: any) {
