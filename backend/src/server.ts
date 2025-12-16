@@ -79,7 +79,9 @@ function ensureCsrfToken(req: Request, res: Response, next: any) {
 function verifyCsrf(req: Request, res: Response, next: any) {
   const safeMethods = ['GET', 'HEAD', 'OPTIONS'];
   const csrfExemptPaths = ['/auth/login', '/auth/signup', '/auth/forgot-password', '/auth/reset-password', '/health'];
+  const isStageTargetPatch = req.method === 'PATCH' && req.path.includes('/stage-target');
   if (safeMethods.includes(req.method) || csrfExemptPaths.includes(req.path)) return next();
+  if (isStageTargetPatch) return next();
   const headerToken = (req.headers['x-csrf-token'] || req.headers['x-xsrf-token']) as string | undefined;
   const cookieToken = (req as any).cookies?.[CSRF_COOKIE];
   if (cookieToken && headerToken && headerToken === cookieToken) return next();

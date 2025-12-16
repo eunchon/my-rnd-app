@@ -603,7 +603,7 @@ router.patch('/:id', authMiddleware, requireRole(['ADMIN', 'EXEC', 'RD', 'SALES'
 });
 
 // Set/update target completion date for a stage (RD/EXEC/ADMIN)
-router.patch('/:id/stage-target', authMiddleware, requireRole(['ADMIN', 'EXEC', 'RD']), async (req: any, res) => {
+router.patch('/:id/stage-target', authMiddleware, requireRole(['ADMIN', 'EXEC', 'RD', 'SALES', 'VIEWER']), async (req: any, res) => {
   const { id } = req.params;
   const { stage, targetDate } = req.body || {};
   if (!stage || !targetDate) return res.status(400).json({ error: 'stage and targetDate required' });
