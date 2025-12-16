@@ -7,34 +7,38 @@ import adminRouter from './views/admin';
 import type { Request, Response } from 'express';
 
 const app = express();
-// CORS: allow frontends (Render backend + Vercel frontend)
+// CORS: allow only known frontends (prod + local dev)
 const allowedOrigins = [
   'https://my-rnd-app.vercel.app',
   'https://my-rnd-app.onrender.com',
-  '*', // fallback for non-browser or local tools
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
 ];
 const corsOptions: cors.CorsOptions = {
   origin: (origin, callback) => {
-    if (!origin) return callback(null, '*'); // non-browser (curl, server-side)
-    if (allowedOrigins.includes('*') || allowedOrigins.includes(origin)) return callback(null, origin);
-    return callback(null, false);
+    if (!origin) return callback(null, true); // non-browser (curl, server-side)
+    if (allowedOrigins.includes(origin)) return callback(null, origin);
+    return callback(new Error('Not allowed by CORS'));
   },
-  credentials: false,
+  credentials: true,
   methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'],
 };
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
 // Explicit CORS headers for all responses (in case upstream proxy strips default middleware)
 app.use((req, res, next) => {
   const origin = req.headers.origin;
-  if (origin && (allowedOrigins.includes(origin) || allowedOrigins.includes('*'))) {
+  if (origin && allowedOrigins.includes(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
   } else {
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Origin', 'null');
   }
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,PUT,DELETE,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-CSRF-Token');
   next();
 });
 

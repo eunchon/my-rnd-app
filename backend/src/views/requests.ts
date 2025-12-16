@@ -6,6 +6,28 @@ import { authMiddleware, requireRole } from './auth';
 
 const router = Router();
 const toNumber = (v: any) => (v === null || v === undefined ? null : Number(v));
+const allowedLinkHosts = ['genoray.com', 'drive.google.com', 'docs.google.com', 'sharepoint.com'];
+
+const isAllowedLink = (val: string) => {
+  try {
+    const url = new URL(val);
+    if (!['http:', 'https:'].includes(url.protocol)) return false;
+    return allowedLinkHosts.some((host) => url.hostname === host || url.hostname.endsWith(`.${host}`));
+  } catch {
+    return false;
+  }
+};
+
+const trimText = (max: number) => z.string().trim().min(1).max(max);
+const optionalTrimText = (max: number) => z.string().trim().max(max).optional();
+const influenceScore = (max: number) => z.number().int().min(0).max(max);
+const referenceLinksSchema = z
+  .string()
+  .trim()
+  .max(1000)
+  .optional()
+  .transform((v) => (v ? v.split(/\s+/).filter(Boolean) : [] as string[]))
+  .refine((links) => links.every(isAllowedLink), { message: 'Only approved links allowed' });
 
 const detailInclude: Prisma.RequestInclude = {
   keywords: true,
@@ -97,55 +119,100 @@ router.get('/', async (req, res) => {
 });
 
 // Create request with validation and related entities
-const createSchema = z.object({
-  title: z.string().min(1),
-  customerName: z.string().min(1),
-  productArea: z.string().min(1),
-  productModel: z.string().optional(),
-  category: z.enum(['NEW_PRODUCT', 'PRODUCT_IMPROVEMENT', 'CUSTOMIZATION']).optional(),
-  expectedRevenue: z
-    .preprocess((v) => {
+const createSchema = z
+  .object({
+    title: trimText(200),
+    customerName: trimText(200),
+    productArea: trimText(50),
+    productModel: optionalTrimText(100),
+    category: z.enum(['NEW_PRODUCT', 'PRODUCT_IMPROVEMENT', 'CUSTOMIZATION']).default('CUSTOMIZATION'),
+    expectedRevenue: z.preprocess((v) => {
       if (v === '' || v === null || v === undefined) return null;
       const num = Number(v);
-      return Number.isFinite(num) ? num : null;
-    }, z.number().nullable().optional())
-    .optional(),
-  revenueEstimateStatus: z
-    .preprocess((v) => (v === null || v === '' ? undefined : v), z.enum(['NUMERIC', 'UNKNOWN']).optional())
-    .optional(),
-  revenueEstimateNote: z.preprocess((v) => (v === null ? undefined : v), z.string().optional()).optional(),
-  technicalNotes: z.preprocess((v) => (v === null ? undefined : v), z.string().optional()).optional(),
-  influenceRevenue: z.preprocess((v) => (v === '' || v === null || v === undefined ? undefined : Number(v)), z.number().optional()).optional(),
-  influenceKol: z.preprocess((v) => (v === '' || v === null || v === undefined ? undefined : Number(v)), z.number().optional()).optional(),
-  influenceReuse: z.preprocess((v) => (v === '' || v === null || v === undefined ? undefined : Number(v)), z.number().optional()).optional(),
-  influenceStrategic: z.preprocess((v) => (v === '' || v === null || v === undefined ? undefined : Number(v)), z.number().optional()).optional(),
-  influenceTender: z.preprocess((v) => (v === '' || v === null || v === undefined ? undefined : Number(v)), z.number().optional()).optional(),
-  importanceFlag: z.enum(['MUST', 'SHOULD', 'NICE']).optional(),
-  customerDeadline: z.preprocess((s) => (s ? new Date(s as string) : null), z.date().nullable().optional()),
-  currentStatus: z.string().optional(),
-  createdByDept: z.string().optional(),
-  createdByUserId: z.string().optional(),
-  createdByName: z.string().optional(),
-  region: z.string().optional(),
-  rawCustomerText: z.string().min(1),
-  salesSummary: z.string().min(1),
-  rdGroupIds: z.array(z.string()).default([]),
-  keywords: z.array(z.string()).optional(),
-  techAreas: z.array(z.object({ groupName: z.string(), code: z.string(), label: z.string() })).optional(),
-  attachments: z.array(z.object({ filename: z.string(), url: z.string().optional() })).optional(),
-  // Option C fields
-  riceReach: z.number().int().positive().optional(),
-  riceImpact: z.number().int().positive().optional(),
-  riceConfidence: z.number().int().positive().optional(),
-  riceEffort: z.number().int().positive().optional(),
-  regulatoryRequired: z.boolean().optional(),
-  regulatoryRiskLevel: z.string().optional(),
-  regulatoryNotes: z.string().optional(),
-  strategicAlignment: z.number().int().positive().optional(),
-  resourceEstimateWeeks: z.number().int().positive().optional(),
-  kpiMetric: z.string().optional(),
-  kpiTarget: z.number().int().positive().optional(),
-});
+      return Number.isFinite(num) ? num : NaN;
+    }, z.number().int().min(0).max(1_000_000_000).nullable()),
+    expectedRevenueUnknown: z.boolean().optional(),
+    revenueEstimateStatus: z
+      .preprocess((v) => (v === null || v === '' ? null : v), z.enum(['NUMERIC', 'UNKNOWN']).nullable())
+      .optional(),
+    revenueEstimateNote: optionalTrimText(1000).nullable().optional(),
+    technicalNotes: optionalTrimText(4000),
+    influenceRevenue: z.preprocess(
+      (v) => (v === '' || v === null || v === undefined ? null : Number(v)),
+      influenceScore(3).nullable()
+    ),
+    influenceKol: z.preprocess(
+      (v) => (v === '' || v === null || v === undefined ? null : Number(v)),
+      influenceScore(2).nullable()
+    ),
+    influenceReuse: z.preprocess(
+      (v) => (v === '' || v === null || v === undefined ? null : Number(v)),
+      influenceScore(2).nullable()
+    ),
+    influenceStrategic: z.preprocess(
+      (v) => (v === '' || v === null || v === undefined ? null : Number(v)),
+      influenceScore(2).nullable()
+    ),
+    influenceTender: z.preprocess(
+      (v) => (v === '' || v === null || v === undefined ? null : Number(v)),
+      influenceScore(1).nullable()
+    ),
+    importanceFlag: z.enum(['MUST', 'SHOULD', 'NICE']).default('MUST'),
+    customerDeadline: z.preprocess((s) => {
+      if (!s) return null;
+      const d = new Date(s as string);
+      return Number.isNaN(d.getTime()) ? null : d;
+    }, z.date().nullable()),
+    currentStatus: optionalTrimText(50),
+    createdByDept: trimText(120),
+    createdByUserId: trimText(120),
+    createdByName: optionalTrimText(120),
+    region: optionalTrimText(10),
+    rawCustomerText: trimText(4000),
+    salesSummary: trimText(4000),
+    rdGroupIds: z.array(z.string().trim()).min(1),
+    keywords: z.array(z.string().trim().min(1).max(100)).optional(),
+    referenceLinks: referenceLinksSchema,
+    techAreas: z
+      .array(
+        z.object({
+          groupName: optionalTrimText(100),
+          code: optionalTrimText(100),
+          label: optionalTrimText(4000),
+        })
+      )
+      .optional(),
+    attachments: z
+      .array(
+        z.object({
+          filename: trimText(255),
+          url: optionalTrimText(2000),
+        })
+      )
+      .optional(),
+    // Option C fields
+    riceReach: z.number().int().positive().max(1000000).optional(),
+    riceImpact: z.number().int().positive().max(1000000).optional(),
+    riceConfidence: z.number().int().positive().max(1000000).optional(),
+    riceEffort: z.number().int().positive().max(1000000).optional(),
+    regulatoryRequired: z.boolean().optional(),
+    regulatoryRiskLevel: optionalTrimText(50),
+    regulatoryNotes: optionalTrimText(4000),
+    strategicAlignment: influenceScore(10).optional(),
+    resourceEstimateWeeks: z.number().int().positive().max(520).optional(),
+    kpiMetric: optionalTrimText(200),
+    kpiTarget: z.number().int().positive().max(10000000).optional(),
+  })
+  .strip();
+
+const updateSchema = createSchema
+  .partial()
+  .extend({
+    currentStage: z.enum(['IDEATION', 'REVIEW', 'CONFIRM', 'PROJECT', 'RELEASE', 'COMPLETE', 'REJECTED']).optional(),
+    referenceLinks: referenceLinksSchema.optional(),
+    rdGroupIds: z.array(z.string().trim()).optional(),
+  })
+  .strip();
 
 router.post('/', authMiddleware, requireRole(['SALES', 'EXEC', 'ADMIN']), async (req: any, res) => {
   const parsed = createSchema.safeParse(req.body);
@@ -425,28 +492,27 @@ router.get('/:id', async (req, res) => {
 // Allow all authenticated roles to update stage/status (wider for simplicity)
 router.patch('/:id', authMiddleware, requireRole(['ADMIN', 'EXEC', 'RD', 'SALES', 'VIEWER']), async (req: any, res) => {
   const { id } = req.params;
+  const parsedBody = updateSchema.safeParse(req.body);
+  if (!parsedBody.success) return res.status(400).json({ error: parsedBody.error.format() });
+  const body = parsedBody.data as any;
   const existing = await prisma.request.findUnique({ where: { id } });
   if (!existing) return res.status(404).json({ error: 'Not found' });
   // Allow updating key fields; ignore unknown keys
-  const body = req.body as any;
   const data: any = {};
   const allowedKeys = [
     'title', 'customerName', 'productArea', 'productModel', 'category', 'expectedRevenue', 'importanceFlag',
     'customerDeadline', 'currentStage', 'currentStatus', 'region', 'rawCustomerText', 'salesSummary',
     'revenueEstimateStatus', 'revenueEstimateNote', 'createdByDept', 'createdByName'
   ];
-  const keywords: string[] | undefined = Array.isArray(body.keywords) ? body.keywords : undefined;
-  const techAreas: Array<{ groupName?: string | null; code?: string | null; label?: string | null }> | undefined =
-    Array.isArray(body.techAreas) ? body.techAreas : undefined;
-  const attachments: Array<{ filename: string; url?: string }> | undefined = Array.isArray(body.attachments)
-    ? body.attachments
-    : undefined;
-  const technicalNotesProvided = Object.prototype.hasOwnProperty.call(body, 'technicalNotes');
+  const keywords: string[] | undefined = body.keywords;
+  const techAreas: Array<{ groupName?: string | null; code?: string | null; label?: string | null }> | undefined = body.techAreas;
+  const attachments: Array<{ filename: string; url?: string }> | undefined = body.attachments;
+  const technicalNotesProvided = Object.prototype.hasOwnProperty.call(req.body, 'technicalNotes');
   const technicalNotes = typeof body.technicalNotes === 'string' ? body.technicalNotes : null;
   for (const k of allowedKeys) {
     if (body[k] !== undefined && body[k] !== null) {
-      if (k === 'customerDeadline') data[k] = new Date(body[k]);
-      else if (k === 'expectedRevenue') data[k] = body[k] === '' ? null : BigInt(body[k]);
+      if (k === 'customerDeadline') data[k] = body[k] instanceof Date ? body[k] : new Date(body[k]);
+      else if (k === 'expectedRevenue') data[k] = body[k] === null ? null : BigInt(body[k]);
       else data[k] = body[k];
     }
   }
@@ -455,7 +521,7 @@ router.patch('/:id', authMiddleware, requireRole(['ADMIN', 'EXEC', 'RD', 'SALES'
     const name = body.createdByName.trim();
     data.createdByName = name.length ? name : existing.createdByName;
   }
-  const newRdGroups: string[] | undefined = Array.isArray(body.rdGroupIds) ? body.rdGroupIds : undefined;
+  const newRdGroups: string[] | undefined = body.rdGroupIds;
   const stageChanged = body.currentStage && body.currentStage !== existing.currentStage;
   await prisma.$transaction(async (tx) => {
     if (Object.keys(data).length > 0) {
