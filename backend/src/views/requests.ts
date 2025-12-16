@@ -272,7 +272,13 @@ router.post('/', authMiddleware, requireRole(['SALES', 'EXEC', 'ADMIN']), async 
       salesSummary: data.salesSummary,
       keywords: { create: (data.keywords ?? []).map((k) => ({ keyword: k })) },
       rdGroups: { create: data.rdGroupIds.map((id) => ({ rdGroupId: id, role: 'LEAD' })) },
-      techAreas: { create: techAreasCreate },
+      techAreas: {
+        create: techAreasCreate.map((t) => ({
+          groupName: t.groupName ?? 'Notes',
+          code: t.code ?? 'NOTE',
+          label: t.label ?? '',
+        })),
+      },
       attachments: { create: data.attachments ?? [] },
       riceReach: data.riceReach ?? null,
       riceImpact: data.riceImpact ?? null,
