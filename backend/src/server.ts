@@ -78,7 +78,8 @@ function ensureCsrfToken(req: Request, res: Response, next: any) {
 }
 function verifyCsrf(req: Request, res: Response, next: any) {
   const safeMethods = ['GET', 'HEAD', 'OPTIONS'];
-  if (safeMethods.includes(req.method)) return next();
+  const csrfExemptPaths = ['/auth/login', '/auth/signup', '/auth/forgot-password', '/auth/reset-password', '/health'];
+  if (safeMethods.includes(req.method) || csrfExemptPaths.includes(req.path)) return next();
   const headerToken = (req.headers['x-csrf-token'] || req.headers['x-xsrf-token']) as string | undefined;
   const cookieToken = (req as any).cookies?.[CSRF_COOKIE];
   if (cookieToken && headerToken && headerToken === cookieToken) return next();
