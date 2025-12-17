@@ -5,7 +5,7 @@
   "type": "commonjs",
   "scripts": {
     "dev": "tsx src/server.ts",
-    "build": "npx prisma generate && npx tsc -b",
+    "build": "npx prisma generate && npx tsc --pretty false",
     "start": "npx prisma migrate deploy && node dist/server.js",
     "prisma:migrate": "prisma migrate dev --name init",
     "prisma:generate": "prisma generate",
