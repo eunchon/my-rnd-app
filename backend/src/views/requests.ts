@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../db';
 import { authMiddleware, requireRole } from './auth';
+import { notifyEvent } from '../notifier';
 
 const router = Router();
 const toNumber = (v: any) => (v === null || v === undefined ? null : Number(v));
@@ -306,6 +307,21 @@ router.post('/', authMiddleware, requireRole(['SALES', 'EXEC', 'ADMIN']), async 
     ...request,
     expectedRevenue: toNumber(request.expectedRevenue),
   });
+
+  // Fire-and-forget notification (best-effort)
+  notifyEvent({
+    type: 'REQUEST_CREATED',
+    data: {
+      id: request.id,
+      title: request.title,
+      productArea: request.productArea,
+      importanceFlag: request.importanceFlag,
+      customerDeadline: request.customerDeadline,
+      createdByUserId: creatorId,
+      createdByName: creatorName,
+      detailUrl: process.env.APP_BASE_URL ? `${process.env.APP_BASE_URL}/request/${request.id}` : undefined,
+    },
+  }).catch((e) => console.error('[notifier] request created error', e));
 });
 
 // Similar requests search: same productArea + LIKE title/rawCustomerText
@@ -646,6 +662,21 @@ router.patch('/:id/stage-target', authMiddleware, requireRole(['ADMIN', 'EXEC', 
   });
 
   res.json({ target: targets.find((t) => t.stage === normalizedStage), targets, history });
+
+  // Fire-and-forget notification
+  notifyEvent({
+    type: 'STAGE_TARGET_UPDATED',
+    data: {
+      id,
+      title: request.title,
+      stage: normalizedStage,
+      targetDate: parsed,
+      previousTarget: existing?.targetDate ?? null,
+      changedByUserId: setByUserId,
+      changedByName: setByName,
+      detailUrl: process.env.APP_BASE_URL ? `${process.env.APP_BASE_URL}/request/${id}` : undefined,
+    },
+  }).catch((e) => console.error('[notifier] stage target update error', e));
 });
 
 // Stage target board data
